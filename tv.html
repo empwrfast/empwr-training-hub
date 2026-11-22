@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EMPWR Today's Lift</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+:root{--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6}
+body.dark{--bg:var(--onyx);--fg:var(--wht);--card:#1C2230}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:Montserrat,sans-serif;height:100vh;display:flex;flex-direction:column;padding:2.5vh 3vw}
+header{display:flex;justify-content:space-between;align-items:center}
+header img{height:9vh}
+body.dark .logo-onyx,body:not(.dark) .logo-white{display:none}
+#toggle{background:none;border:2px solid var(--fg);color:var(--fg);border-radius:50%;width:5vh;height:5vh;font-size:2.4vh;cursor:pointer}
+.title{text-align:center;margin:2vh 0}
+.title h1{font-family:'Bebas Neue';font-size:9vh;letter-spacing:.05em;line-height:1}
+.title h2{font-family:'Mr Dafoe';color:var(--red);font-size:6vh;margin-top:-2vh}
+main{flex:1;display:grid;grid-template-columns:1fr 26vw;gap:3vw;min-height:0}
+#lifts{display:flex;flex-direction:column;gap:1.6vh;overflow:hidden}
+.lift{background:var(--card);border-left:1vh solid var(--red);border-radius:1.2vh;padding:1.8vh 2vw;display:grid;grid-template-columns:6vw 1fr auto;align-items:center}
+.lift .n{font-family:'Bebas Neue';font-size:7vh;color:var(--red)}
+.lift .ex{font-family:'Bebas Neue';font-size:5.5vh;letter-spacing:.03em}
+.lift .meta{font-size:2.2vh;opacity:.75;margin-top:.4vh}
+.lift .scheme{font-family:'Bebas Neue';font-size:6vh}
+aside{display:flex;flex-direction:column;gap:2vh}
+.box{background:var(--card);border-radius:1.2vh;padding:2vh;text-align:center}
+.box h3{font-family:'Bebas Neue';font-size:4vh;letter-spacing:.05em}
+#qr{background:#fff;padding:1.5vh;border-radius:1vh;display:inline-block;margin:1.5vh 0}
+.big{font-family:'Bebas Neue';font-size:12vh;color:var(--red);line-height:1}
+#feed{text-align:left;font-size:2vh;line-height:1.7}
+footer{display:flex;justify-content:flex-end}
+footer img{height:7vh}
+.empty{font-size:3vh;opacity:.7;text-align:center;margin-top:10vh}
+</style></head>
+<body>
+<header>
+  <img class="logo-onyx" src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
+  <img class="logo-white" src="empwr-logo-en-tag-white.svg" alt="EMPWR Fitness and Sports Training">
+  <button id="toggle" title="Theme">☀️</button>
+</header>
+<div class="title"><h1 id="sessTitle">Today's Lift</h1><h2 id="sessSub"></h2></div>
+<main>
+  <section id="lifts"><div class="empty">Loading today's session...</div></section>
+  <aside>
+    <div class="box"><h3>Log Your Lift</h3>
+      <div style="font-size:2vh">Open the EMPWR app, or scan</div>
+      <div id="qr"></div></div>
+    <div class="box"><h3>Logged Today</h3><div class="big" id="count">0</div></div>
+    <div class="box"><h3>New PRs</h3><div id="feed">No PRs yet. Go get one.</div></div>
+  </aside>
+</main>
+<footer><img src="pitter-patter-red.svg" alt="Pitter Patter Make It Matter"></footer>
+<script>
+// ===== CONFIG: paste from Supabase > Project Settings > API =====
+const SUPABASE_URL = "https://utljgnuieyjdqclfiwqz.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3";
+const APP_URL = "https://empwrfast.github.io/empwr-training-hub/log.html";
+// ================================================================
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'sgpt' } });
+const t = document.getElementById('toggle');
+t.onclick = () => { document.body.classList.toggle('dark');
+  t.textContent = document.body.classList.contains('dark') ? '🌙' : '☀️'; };
+
+async function loadSession(){
+  const { data, error } = await sb.from('todays_session').select('*');
+  const el = document.getElementById('lifts');
+  if (error || !data || !data.length){ el.innerHTML = '<div class="empty">No session programmed for today.</div>'; return null; }
+  const s = data[0];
+  document.getElementById('sessTitle').textContent = s.title || "Today's Lift";
+  document.getElementById('sessSub').textContent = `Week ${s.week}, ${s.day}`;
+  el.innerHTML = data.map((r,i)=>`
+    <div class="lift"><div class="n">${String.fromCharCode(65+i)}</div>
+      <div><div class="ex">${r.exercise}</div>
+      <div class="meta">${[r.tempo&&'Tempo '+r.tempo, r.rest&&'Rest '+r.rest, r.intensity].filter(Boolean).join('  |  ')}</div></div>
+      <div class="scheme">${r.sets} x ${r.reps}</div></div>`).join('');
+  return s.session_id;
+}
+async function loadStats(){
+  const today = new Date().toISOString().slice(0,10);
+  const { count } = await sb.from('workout_logs').select('id',{count:'exact',head:true}).eq('log_date', today);
+  document.getElementById('count').textContent = count || 0;
+  const { data } = await sb.from('personal_records')
+    .select('value,pr_type,members(first_name),exercises(name)')
+    .eq('achieved_on', today).eq('pr_type','heaviest').limit(6);
+  if (data && data.length) document.getElementById('feed').innerHTML =
+    data.map(p=>`🔥 <b>${p.members.first_name}</b>, ${p.exercises.name} ${p.value}`).join('<br>');
+}
+(async()=>{
+  const sid = await loadSession();
+  const cv=document.createElement('canvas'); document.getElementById('qr').appendChild(cv); QRCode.toCanvas(cv, `${APP_URL}?log=${sid||''}`, {width:220});
+  loadStats();
+  sb.channel('floor').on('postgres_changes',{event:'INSERT',schema:'public',table:'set_logs'},loadStats)
+    .on('postgres_changes',{event:'*',schema:'public',table:'personal_records'},loadStats).subscribe();
+  setInterval(()=>{ loadSession(); loadStats(); }, 5*60*1000);
+})();
+</script></body></html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EMPWR Log Your Lift</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6;--line:#D9DCE1}
+body.dark{--bg:var(--onyx);--fg:var(--wht);--card:#1C2230;--line:#2C3446}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:Montserrat,sans-serif;max-width:640px;margin:auto;padding:16px 16px 90px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+header img{height:44px}
+body.dark .logo-onyx,body:not(.dark) .logo-white{display:none}
+#toggle{background:none;border:2px solid var(--fg);color:var(--fg);border-radius:50%;width:38px;height:38px;cursor:pointer}
+h1{font-family:'Bebas Neue';font-size:40px;letter-spacing:.04em;line-height:1}
+h2{font-family:'Mr Dafoe';color:var(--red);font-size:30px;margin:-6px 0 10px}
+h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em}
+.card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}
+input,select{font:inherit;width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+button.main{font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;width:100%;padding:12px;border:0;border-radius:10px;background:var(--red);color:#fff;cursor:pointer;margin-top:10px}
+.hidden{display:none}
+.scale{display:flex;gap:6px;margin:6px 0 12px}
+.scale button{flex:1;padding:10px 0;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-weight:800;cursor:pointer}
+.scale button.on{background:var(--red);color:#fff;border-color:var(--red)}
+.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-family:'Bebas Neue';font-size:22px;color:#fff}
+.Green{background:#2E9E5B}.Yellow{background:#E0B21F}.Orange{background:#E07A1F}.Red{background:var(--red)}
+.ex{border-left:6px solid var(--red)}
+.exhead{display:flex;justify-content:space-between;align-items:baseline}
+.meta{font-size:13px;opacity:.75;margin:4px 0 8px}
+.sugg{font-size:14px;margin-bottom:8px}
+.sugg b{color:var(--red)}
+.set{display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;align-items:center;margin:6px 0}
+.set span{font-family:'Bebas Neue';font-size:22px;text-align:center}
+.pr{color:var(--red);font-weight:800}
+footer{position:fixed;bottom:8px;right:12px}
+footer img{height:40px}
+a{color:var(--red)}
+</style></head>
+<body>
+<header>
+  <img class="logo-onyx" src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
+  <img class="logo-white" src="empwr-logo-en-tag-white.svg" alt="EMPWR Fitness and Sports Training">
+  <button id="toggle">☀️</button>
+</header>
+
+<!-- STEP 1: WHO -->
+<section id="stepWho">
+  <h1>Log Your Lift</h1><h2>Who's Training?</h2>
+  <div class="card">
+    <input id="search" placeholder="Start typing your name" autocomplete="off">
+    <div id="results"></div>
+  </div>
+  <div class="card" style="font-size:13px">Coach mode: pick any member and log for them.</div>
+</section>
+
+<!-- STEP 2: READINESS -->
+<section id="stepReady" class="hidden">
+  <h1 id="hello">Hey</h1><h2>How Are You Feeling?</h2>
+  <div class="card" id="scales"></div>
+  <button class="main" id="readyBtn">Show My Session</button>
+</section>
+
+<!-- STEP 3: SESSION -->
+<section id="stepSession" class="hidden">
+  <h1 id="sessTitle">Today's Lift</h1><h2 id="sessSub"></h2>
+  <div class="card"><span id="badge" class="badge"></span>
+    <div id="guidance" style="margin-top:8px;font-size:14px"></div>
+    <div id="injury" style="margin-top:8px;font-size:14px"></div></div>
+  <div id="exList"></div>
+  <button class="main" id="saveBtn">Save Session</button>
+  <div id="saved" class="card hidden"></div>
+</section>
+
+<footer><img src="pitter-patter-red.svg" alt="Pitter Patter Make It Matter"></footer>
+
+<script>
+// ===== CONFIG: paste from Supabase > Project Settings > API =====
+const SUPABASE_URL = "https://utljgnuieyjdqclfiwqz.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3";
+// ================================================================
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'sgpt' } });
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const enteredBy = params.get('mode') || (params.get('log') !== null ? 'member' : 'tablet'); // ?mode=coach on laptops
+const tg=$('toggle'); tg.onclick=()=>{document.body.classList.toggle('dark');tg.textContent=document.body.classList.contains('dark')?'🌙':'☀️';};
+let member=null, readiness=null, rule=null, items=[], last={}, prs={};
+const show = id => ['stepWho','stepReady','stepSession'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
+const round5 = w => Math.round(w/5)*5;
+
+// STEP 1
+let t; $('search').oninput = e => { clearTimeout(t); t = setTimeout(async()=>{
+  const q = e.target.value.trim(); if (q.length < 2) { $('results').innerHTML=''; return; }
+  const { data } = await sb.from('members').select('id,first_name,last_name')
+    .eq('active',true).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(8);
+  $('results').innerHTML = (data||[]).map(m=>`<button class="main" style="background:var(--onyx)" data-id="${m.id}" data-n="${m.first_name}">${m.first_name} ${m.last_name}</button>`).join('');
+  $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>{ member={id:b.dataset.id,first:b.dataset.n}; startReady(); });
+},250); };
+
+// STEP 2
+const Q = [['sleep','Sleep'],['energy','Energy'],['soreness','Soreness (5 = not sore)'],['stress','Stress (5 = calm)']];
+const vals = {};
+function startReady(){
+  $('hello').textContent = `Hey ${member.first}`;
+  $('scales').innerHTML = Q.map(([k,l])=>`<div><b>${l}</b><div class="scale" data-k="${k}">${[1,2,3,4,5].map(n=>`<button data-v="${n}">${n}</button>`).join('')}</div></div>`).join('');
+  $('scales').querySelectorAll('.scale').forEach(row=>row.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    row.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); vals[row.dataset.k]=+b.dataset.v; }));
+  show('stepReady');
+}
+$('readyBtn').onclick = async () => {
+  if (Q.some(([k])=>!vals[k])) { alert('Tap a number for each one.'); return; }
+  const { data } = await sb.from('readiness_checkins').insert({member_id:member.id, ...vals}).select().single();
+  readiness = data;
+  const { data: rules } = await sb.from('readiness_rules').select('*');
+  rule = rules.find(r => data.score >= r.min_score && data.score <= r.max_score) || rules[0];
+  loadSession();
+};
+
+// STEP 3
+async function loadSession(){
+  const { data } = await sb.from('todays_session').select('*');
+  items = data || [];
+  if (!items.length) { $('exList').innerHTML = '<div class="card">No session programmed for today.</div>'; show('stepSession'); return; }
+  $('sessTitle').textContent = items[0].title || "Today's Lift";
+  $('sessSub').textContent = `Week ${items[0].week}, ${items[0].day}`;
+  $('badge').textContent = rule.label; $('badge').className = 'badge ' + rule.label;
+  $('guidance').textContent = rule.guidance;
+
+  // active injury: point to their protocol
+  const { data: inj } = await sb.from('injuries').select('body_area,injury_protocols(pdf_url)').eq('member_id',member.id).neq('status','cleared');
+  if (inj && inj.length) $('injury').innerHTML = inj.map(i=>`Active: <b>${i.body_area}</b>. ${i.injury_protocols && i.injury_protocols.pdf_url ? `<a href="${i.injury_protocols.pdf_url}" target="_blank">Open your ${i.body_area} mobility plan</a>` : 'Check with a coach for your mobility plan.'}`).join('<br>');
+
+  // previous weights + PRs for these exercises
+  const { data: exIds } = await sb.from('exercises').select('id,name').in('name', items.map(i=>i.exercise));
+  const idByName = Object.fromEntries((exIds||[]).map(e=>[e.name,e.id]));
+  items.forEach(i => i.exercise_id = idByName[i.exercise]);
+  const ids = items.map(i=>i.exercise_id).filter(Boolean);
+  const { data: sl } = await sb.from('suggested_loads').select('*').eq('member_id',member.id).in('exercise_id',ids);
+  (sl||[]).forEach(r => last[r.exercise_id] = r.last_weight);
+  const { data: pr } = await sb.from('personal_records').select('*').eq('member_id',member.id).in('exercise_id',ids);
+  (pr||[]).forEach(r => { (prs[r.exercise_id] ||= {})[r.pr_type] = r.value; });
+
+  $('exList').innerHTML = items.map((it,idx)=>{
+    const lw = last[it.exercise_id];
+    const sug = lw ? round5(lw * rule.load_pct/100) : null;
+    const p = prs[it.exercise_id] || {};
+    const nSets = Math.max(1, it.sets || 3);
+    return `<div class="card ex" data-idx="${idx}">
+      <div class="exhead"><h3>${String.fromCharCode(65+idx)}. ${it.exercise}</h3><b>${it.sets} x ${it.reps}</b></div>
+      <div class="meta">${[it.tempo&&'Tempo '+it.tempo, it.rest&&'Rest '+it.rest, it.intensity].filter(Boolean).join(' | ')}
+        ${it.video_url?` | <a href="${it.video_url}" target="_blank">Video</a>`:''}</div>
+      <div class="sugg">${lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
+        ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
+      ${Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
+        <input type="number" inputmode="decimal" placeholder="lb" value="${sug||''}" data-w>
+        <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(it.reps)||''}" data-r></div>`).join('')}
+    </div>`;}).join('');
+  show('stepSession');
+}
+
+$('saveBtn').onclick = async () => {
+  $('saveBtn').disabled = true;
+  const { data: wl, error } = await sb.from('workout_logs').insert({
+    member_id: member.id, session_id: items[0] && items[0].session_id,
+    entered_by: enteredBy, readiness_id: readiness && readiness.id }).select().single();
+  if (error) { alert('Could not save. Try again.'); $('saveBtn').disabled=false; return; }
+  const rows = [];
+  document.querySelectorAll('.ex').forEach(card=>{
+    const it = items[+card.dataset.idx];
+    card.querySelectorAll('.set').forEach((row,s)=>{
+      const w = parseFloat(row.querySelector('[data-w]').value), r = parseInt(row.querySelector('[data-r]').value);
+      if (w && r && it.exercise_id) rows.push({workout_log_id: wl.id, member_id: member.id, exercise_id: it.exercise_id, set_number: s+1, weight: w, reps: r});
+    });
+  });
+  if (rows.length) await sb.from('set_logs').insert(rows);
+  // check what got beaten
+  const today = new Date().toISOString().slice(0,10);
+  const { data: newPr } = await sb.from('personal_records').select('pr_type,value,exercises(name)').eq('member_id',member.id).eq('achieved_on',today);
+  const label = {heaviest:'Heaviest',est_5rm:'Est. 5RM',session_volume:'Volume'};
+  $('saved').innerHTML = `<h3>Saved. Nice Work, ${member.first}.</h3>` +
+    (newPr && newPr.length ? newPr.map(p=>`<div class="pr">🔥 New ${label[p.pr_type]} PR: ${p.exercises.name} ${p.value}</div>`).join('') : '<div>Logged. See you next session.</div>') +
+    `<button class="main" onclick="location.reload()">Next Person</button>`;
+  $('saved').classList.remove('hidden'); $('saveBtn').classList.add('hidden');
+};
+</script></body></html>
