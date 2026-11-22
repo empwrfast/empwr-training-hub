@@ -4,7 +4,7 @@
 <title>EMPWR Today's Lift</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6}
 body.dark{--bg:var(--onyx);--fg:var(--wht);--card:#1C2230}
@@ -30,8 +30,9 @@ aside{display:flex;flex-direction:column;gap:2vh}
 #qr{background:#fff;padding:1.5vh;border-radius:1vh;display:inline-block;margin:1.5vh 0}
 .big{font-family:'Bebas Neue';font-size:12vh;color:var(--red);line-height:1}
 #feed{text-align:left;font-size:2vh;line-height:1.7}
-footer{display:flex;justify-content:flex-end}
+footer{display:flex;justify-content:flex-end;padding-top:1vh}
 footer img{height:7vh}
+#feed{max-height:18vh;overflow:hidden}
 .empty{font-size:3vh;opacity:.7;text-align:center;margin-top:10vh}
 </style></head>
 <body>
@@ -89,7 +90,7 @@ async function loadStats(){
 }
 (async()=>{
   const sid = await loadSession();
-  const cv=document.createElement('canvas'); document.getElementById('qr').appendChild(cv); QRCode.toCanvas(cv, `${APP_URL}?log=${sid||''}`, {width:220});
+  new QRCode(document.getElementById('qr'), {text:`${APP_URL}?log=${sid||''}`, width:220, height:220});
   loadStats();
   sb.channel('floor').on('postgres_changes',{event:'INSERT',schema:'public',table:'set_logs'},loadStats)
     .on('postgres_changes',{event:'*',schema:'public',table:'personal_records'},loadStats).subscribe();
