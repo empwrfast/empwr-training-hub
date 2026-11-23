@@ -34,11 +34,41 @@ footer{display:flex;justify-content:flex-end;padding-top:1vh}
 footer img{height:7vh}
 #feed{max-height:18vh;overflow:hidden}
 .empty{font-size:3vh;opacity:.7;text-align:center;margin-top:10vh}
+
+/* ===== v2: header line, block banner, paged blocks ===== */
+.title{display:none}
+header{gap:1.4vw}
+#hdrT{flex:1;display:flex;align-items:center;gap:1.2vw;min-width:0;font-family:'Bebas Neue';letter-spacing:.04em}
+#hdrT .tl{flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:.8vw;line-height:1}
+#hdrT .ph{font-size:3.6vh;white-space:nowrap}
+.cur{font-family:'Mr Dafoe';color:var(--red);text-transform:none;letter-spacing:0;white-space:nowrap}
+#hdrR{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+#tclk{font-size:6vh;color:var(--red)}
+#hdrR .dt{font-size:2.2vh;opacity:.7;white-space:nowrap}
+#toggle{display:none}
+main{margin-top:1.5vh}
+#lifts{display:flex;flex-direction:column;gap:1.3vh;overflow:hidden}
+#band{display:flex;justify-content:space-between;align-items:center;background:var(--red);color:#fff;border-radius:1vh;padding:.8vh 1.6vw;margin-bottom:.4vh}
+#band .l{display:flex;align-items:baseline;gap:1.4vw}
+#band .nm{font-family:'Bebas Neue';font-size:4.6vh;line-height:1;letter-spacing:.04em}
+#band .q{font-family:'Mr Dafoe';font-size:3.8vh;line-height:1}
+#band .tm{font-family:'Bebas Neue';font-size:2.6vh;letter-spacing:.06em}
+.lift{padding:1.6vh 1.4vw;grid-template-columns:5.5vw 1fr auto}
+.lift>div:nth-child(2){min-width:0}
+.lift .n{font-size:4.6vh}
+.lift .ex{white-space:nowrap;overflow:hidden;line-height:1.05}
+.lift .note{font-size:2.2vh;color:var(--red);font-weight:700;margin-top:.3vh}
+.lift .scheme{font-size:4.2vh;margin-left:1.2vw;white-space:nowrap}
+#navrow{display:flex;justify-content:center;align-items:center;gap:1.2vw;margin-top:auto;padding-top:.6vh}
+#navrow .dot{width:1.6vh;height:1.6vh;border-radius:50%;background:var(--fg);opacity:.2;cursor:pointer}
+#navrow .dot.on{opacity:1;background:var(--red);width:4vh;border-radius:1vh}
+#navrow .nb{width:4.6vh;height:4.6vh;border-radius:50%;border:2px solid var(--fg);background:none;color:var(--fg);font:600 2.6vh Montserrat;line-height:1;cursor:pointer;opacity:.5}
 </style></head>
 <body>
 <header>
   <img class="logo-onyx" src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
   <img class="logo-white" src="empwr-logo-en-tag-white.svg" alt="EMPWR Fitness and Sports Training">
+  <div id="hdrT"><div class="tl"><span class="ph" id="phase"></span><span class="cur" id="aim"></span></div><div id="hdrR"><span id="tclk"></span><span class="dt" id="dt"></span></div></div>
   <button id="toggle" title="Theme">☀️</button>
 </header>
 <div class="title"><h1 id="sessTitle">Today's Lift</h1><h2 id="sessSub"></h2></div>
@@ -64,19 +94,77 @@ const t = document.getElementById('toggle');
 t.onclick = () => { document.body.classList.toggle('dark');
   t.textContent = document.body.classList.contains('dark') ? '🌙' : '☀️'; };
 
+// Section quality + time come from the sheet. Labels (A1, i, ...) are stored in "tempo",
+// the section's time window (e.g. "22-38") in "rest" by the sheet sync.
+const pad = n => String(n).padStart(2,'0');
+const titleCase = s => s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s|&)(\w)/g,(m,a,b)=>a+b.toUpperCase()) : s;
+const scheme = r => { const reps = String(r.reps||'').split('|').pop().trim();
+  return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} sets`) : reps; };
+let pages = [], pageIdx = 0, sessionId = null;
+
+function setHeader(s){
+  const t = (s.title||'').trim();
+  const ph = (t.match(/\[\s*(phase\s*\d+)\s*\]/i)||[])[1] || '';
+  const aim = t.split('--').pop().replace(/\[.*?\]/g,'').trim();
+  document.getElementById('phase').textContent = ph ? titleCase(ph.replace(/\s+/,' ')) : '';
+  document.getElementById('aim').textContent = titleCase(aim);
+  const d = new Date();
+  const dayName = d.toLocaleDateString('en-CA',{weekday:'long'});
+  const md = d.toLocaleDateString('en-CA',{month:'short',day:'numeric'}).replace(/\./g,'');
+  document.getElementById('dt').textContent = `${dayName} · ${md} · Week ${s.week}`;
+  fitAim();
+}
+function fitAim(){
+  const t = document.querySelector('#hdrT .tl'), a = document.getElementById('aim');
+  let f = 20; a.style.fontSize = f+'px';
+  while (t.scrollWidth <= t.clientWidth && f < innerHeight*0.1){ f++; a.style.fontSize = f+'px'; }
+  if (t.scrollWidth > t.clientWidth) a.style.fontSize = (f-1)+'px';
+}
+function fitNames(){
+  document.querySelectorAll('.lift .ex').forEach(e=>{
+    let f = innerHeight*0.046; e.style.fontSize = f+'px';
+    while (e.scrollWidth > e.clientWidth && f > 14){ f--; e.style.fontSize = f+'px'; }
+  });
+}
+function draw(){
+  const el = document.getElementById('lifts');
+  if (!pages.length){ el.innerHTML = '<div class="empty">No session programmed for today.</div>'; return; }
+  if (pageIdx >= pages.length) pageIdx = 0;
+  const pg = pages[pageIdx];
+  el.innerHTML =
+    `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.q}</span></div>`+
+    `<span class="tm">${pg.tm ? pg.tm+' min' : ''}</span></div>`+
+    pg.items.map(r=>`<div class="lift"><div class="n">${r.tempo||''}</div>
+      <div><div class="ex">${r.exercise}</div></div>
+      <div class="scheme">${scheme(r)}</div></div>`).join('')+
+    `<div id="navrow"><button class="nb" data-d="-1">‹</button>${pages.map((_,j)=>`<span class="dot${j===pageIdx?' on':''}" data-j="${j}"></span>`).join('')}<button class="nb" data-d="1">›</button></div>`;
+  el.querySelectorAll('.dot').forEach(d=>d.onclick=()=>{ pageIdx = +d.dataset.j; draw(); });
+  el.querySelectorAll('.nb').forEach(b=>b.onclick=()=>go(+b.dataset.d));
+  fitNames();
+}
+function go(dir){ if(!pages.length) return; pageIdx = (pageIdx + dir + pages.length) % pages.length; draw(); }
+document.addEventListener('keydown', e=>{
+  if (e.key==='ArrowRight' || e.key===' ') go(1);
+  if (e.key==='ArrowLeft') go(-1);
+});
+addEventListener('resize', ()=>{ fitAim(); fitNames(); });
+setInterval(()=>{ const d=new Date(); document.getElementById('tclk').textContent = `${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }, 1000);
+
 async function loadSession(){
   const { data, error } = await sb.from('todays_session').select('*');
-  const el = document.getElementById('lifts');
-  if (error || !data || !data.length){ el.innerHTML = '<div class="empty">No session programmed for today.</div>'; return null; }
-  const s = data[0];
-  document.getElementById('sessTitle').textContent = s.title || "Today's Lift";
-  document.getElementById('sessSub').textContent = `Week ${s.week}, ${s.day}`;
-  el.innerHTML = data.map((r,i)=>`
-    <div class="lift"><div class="n">${String.fromCharCode(65+i)}</div>
-      <div><div class="ex">${r.exercise}</div>
-      <div class="meta">${[r.tempo&&'Tempo '+r.tempo, r.rest&&'Rest '+r.rest, r.intensity].filter(Boolean).join('  |  ')}</div></div>
-      <div class="scheme">${r.sets} x ${r.reps}</div></div>`).join('');
-  return s.session_id;
+  if (error || !data || !data.length){ pages = []; draw(); return null; }
+  setHeader(data[0]);
+  pages = []; let cur = null;
+  data.forEach(r=>{
+    const raw = (r.intensity||'').replace(/\s+/g,' ').trim();
+    const nm = raw.replace(/\[.*?\]/g,'').trim().split(' ')[0] || 'Today';
+    let q = (raw.match(/\[(.*?)\]/)||[])[1] || raw.replace(/\[.*?\]/g,'').trim().split(' ').slice(1).join(' ');
+    if (nm.includes('☠')) q = 'Choose 🤗 1';
+    if (!cur || cur.nm !== nm){ cur = { nm, q: titleCase(q), tm: r.rest || '', items: [] }; pages.push(cur); }
+    cur.items.push(r);
+  });
+  draw();
+  return data[0].session_id;
 }
 async function loadStats(){
   const today = new Date().toISOString().slice(0,10);
