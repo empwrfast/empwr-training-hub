@@ -214,7 +214,7 @@ async function loadSession(){
       if (tg==='SET') return `<h2 style="margin:10px 0 0">${it.exercise}</h2>`;
       const head = wuLast!==tg ? `<div style="background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:22px;letter-spacing:.06em;border-radius:8px;padding:6px 12px;margin-top:16px"><span style="color:var(--red)">${tg==='TURF'?'1':'2'}</span> ${tg==='TURF'?'Turf Drills':'Lunges, Hips + Crawl'}</div>` : '';
       wuLast = tg;
-      return head + `<div class="card ex" data-idx="${idx}"><div class="exhead"><h3>${it.exercise}</h3><b>${schemeOf(it)}</b></div></div>`;
+      return head + `<div class="card ex" data-idx="${idx}"><div class="exhead"><h3>${it.exercise.replace(/\bx\d+( each side)?/gi, m=>`<span style="color:var(--red)">${m}</span>`)}</h3><b>${schemeOf(it)}</b></div></div>`;
     }
     const lw = last[it.exercise_id];
     const sug = lw ? round5(lw * rule.load_pct/100) : null;
