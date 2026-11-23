@@ -266,6 +266,12 @@ async function loadSession(){
     cur.items.push(r);
   });
   pages.forEach(pg=>fillReps(pg.items));
+  // Warm-up gets 2 pages so the text can be big: 1) foam roll + turf drills, 2) lunges, hips + crawl
+  { const i = pages.findIndex(p => p.nm === 'RELEASE');
+    if (i > -1) { const p = pages[i], t = r => r.tempo || '';
+      const a = p.items.filter(r => ['COACH','FOAM','SET','TURF'].includes(t(r)));
+      const b = p.items.filter(r => !['COACH','FOAM','TURF'].includes(t(r)));
+      if (a.some(r => t(r) === 'TURF') && b.some(r => t(r) === 'FLOOR')) pages.splice(i, 1, Object.assign({}, p, {items: a}), Object.assign({}, p, {items: b})); } }
   draw();
   return data[0].session_id;
 }
@@ -296,5 +302,23 @@ function fitWU(){ const L = document.getElementById('lifts'); if (!L) return;
   while (over() && k > 0.45) { k -= 0.03; L.style.setProperty('--k', k.toFixed(2)); } }
 new MutationObserver(() => requestAnimationFrame(fitWU)).observe(document.getElementById('lifts'), {childList:true});
 addEventListener('resize', fitWU);
+</script>
+<script>
+// v7 warm-up legibility: shared rep note moves to the section bar, a lone section splits in 2 columns, bolder text, grows to fill the screen
+(function(){ const st = document.createElement('style');
+  st.textContent = '.wn{-webkit-text-stroke:.035em currentColor;letter-spacing:.02em}.wuh .same{margin-left:1vw;color:#fff;opacity:.75;font-size:.8em}.wusec.allsame .wr{display:none}'
+    + '.wucols.one{grid-template-columns:1fr}.wusec.split{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;align-content:start;column-gap:1.2vw}.wusec.split .wuh{grid-column:1/-1;grid-row:1}';
+  document.head.appendChild(st); })();
+function fitWU(){ const L = document.getElementById('lifts'); if (!L) return;
+  const W = L.querySelector('.wucols'); if (!W) { L.style.removeProperty('--k'); return; }
+  const secs = [...W.querySelectorAll('.wusec')];
+  secs.forEach(sec => { if (sec.dataset.done) return; sec.dataset.done = 1;
+    const r = [...sec.querySelectorAll('.wr')].map(x => x.textContent.trim()); const h = sec.querySelector('.wuh');
+    if (r.length > 1 && r[0] && r.every(x => x === r[0]) && h) { sec.classList.add('allsame'); h.insertAdjacentHTML('beforeend', '<span class="same">' + r[0] + ' Each</span>'); } });
+  if (secs.length === 1 && !W.classList.contains('one')) { const n = secs[0].querySelectorAll('.wu').length; W.classList.add('one');
+    if (n >= 4) { secs[0].classList.add('split'); secs[0].style.gridTemplateRows = 'auto repeat(' + Math.ceil(n / 2) + ', auto)'; } }
+  const over = () => L.scrollHeight > L.clientHeight + 2 || W.scrollHeight > W.clientHeight + 2;
+  let k = 2.4; L.style.setProperty('--k', k);
+  while (over() && k > 0.45) { k -= 0.03; L.style.setProperty('--k', k.toFixed(2)); } }
 </script>
 </body></html>
