@@ -236,7 +236,7 @@ function draw(){
   el.innerHTML =
     `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.nm === 'RELEASE' ? '' : pg.q}</span></div>`+
     `<span class="tm">${pg.tm ? pg.tm+' min' : ''}</span></div>`+
-    (pg.nm === 'RELEASE' ? releaseHtml(pg.items) : groupHtml(pg.items, (r,gap)=>`<div class="lift${gap?' gap':''}"><div class="n">${r.tempo||''}</div>
+    (pg.last ? lastHtml() : (pg.nm === 'REACTIVE' && /intro/i.test(pg.q)) ? introHtml(pg.items) : pg.nm === 'RELEASE' ? releaseHtml(pg.items) : groupHtml(pg.items, (r,gap)=>`<div class="lift${gap?' gap':''}"><div class="n">${r.tempo||''}</div>
       <div><div class="ex">${r.exercise}</div>${maxRule(r) ? `<div class="note">${maxRule(r)}</div>` : ''}</div>
       <div class="scheme">${scheme(r)}</div></div>`))+
     `<div id="navrow"><button class="nb" data-d="-1">‹</button>${pages.map((_,j)=>`<span class="dot${j===pageIdx?' on':''}" data-j="${j}"></span>`).join('')}<button class="nb" data-d="1">›</button></div>`;
@@ -266,6 +266,8 @@ async function loadSession(){
     cur.items.push(r);
   });
   pages.forEach(pg=>fillReps(pg.items));
+  // LAST TIME page goes right before the lift
+  { const r = pages.findIndex(p => /^RESISTANCE/i.test(p.nm)); if (r > -1) pages.splice(r, 0, { raw: 'LAST', nm: 'LAST TIME', q: 'Your Numbers', tm: '', items: [], last: true }); }
   // Warm-up gets 2 pages so the text can be big: 1) foam roll + turf drills, 2) lunges, hips + crawl
   { const i = pages.findIndex(p => p.nm === 'RELEASE');
     if (i > -1) { const p = pages[i], t = r => r.tempo || '';
@@ -320,5 +322,55 @@ function fitWU(){ const L = document.getElementById('lifts'); if (!L) return;
   const over = () => L.scrollHeight > L.clientHeight + 2 || W.scrollHeight > W.clientHeight + 2;
   let k = 2.4; L.style.setProperty('--k', k);
   while (over() && k > 0.45) { k -= 0.03; L.style.setProperty('--k', k.toFixed(2)); } }
+</script>
+<script>
+// REACTIVE INTRO: drills are coach-led (not shown); members go jump on the Hawkin force plates
+function introHtml(list){ const fp = list.find(r => /force\s*plate/i.test(r.exercise));
+  const cue = fp ? titleCase(fp.exercise.replace(/\s+-\s+/g, ', ')).replace(/!+$/, '') : 'Test Your Jump On The Force Plates';
+  return '<div class="hkw"><div class="hkt"><img class="hkl" src="https://www.hawkindynamics.com/hs-fs/hubfs/Brand%20Guidelines%202026/Logos/logo_horz-white.png" alt="Hawkin Dynamics"><div class="hkh">Go Jump On The Hawkin Force Plates</div><div class="hkc">' + cue + '</div></div>'
+    + '<img class="hkp" src="force-plate.jpg" alt="Jumping on the Hawkin force plates at EMPWR" onerror="this.style.display=\'none\'"></div>'; }
+(function(){ const st = document.createElement('style');
+  st.textContent = '.hkw{display:flex;gap:2vw;align-items:stretch;height:100%;min-height:0}.hkt{flex:1;background:var(--onyx,#12161F);color:#fff;border-radius:1.4vh;padding:4vh 3vw;display:flex;flex-direction:column;justify-content:center;gap:2.4vh}.hkl{height:9vh;width:auto;align-self:flex-start}.hkh{font-family:"Bebas Neue";font-size:9vh;line-height:.95;letter-spacing:.02em}.hkc{font-family:"Bebas Neue";font-size:5vh;color:#EB5345;letter-spacing:.03em}.hkp{flex:1;min-width:0;object-fit:cover;border-radius:1.4vh;max-height:70vh}';
+  document.head.appendChild(st); })();
+// LAST TIME page: who checked in on the iPad today + their top set last time on each main lift
+let __lt = null;
+function lastHtml(){
+  if (!__lt) return '<div class="empty">Loading...</div>';
+  if (!__lt.rows.length) return '<div class="empty">Check in on the iPad and your numbers from last time show up here.</div>';
+  return `<div class="ltwrap"><table class="lt"><tr><th></th>${__lt.lifts.map(l => `<th><b>${l.tempo || ''}</b> ${titleCase(l.exercise)}</th>`).join('')}</tr>` +
+    __lt.rows.map(r => `<tr><td class="ltn">${r.name}</td>${r.vals.map(v => `<td>${v}</td>`).join('')}</tr>`).join('') + '</table></div>';
+}
+async function loadLast(){ try {
+  const rp = pages.find(p => /^RESISTANCE/i.test(p.nm)); if (!rp) return;
+  const lifts = rp.items.filter(r => r.sets);
+  const { data: ex } = await sb.from('exercises').select('id,name').in('name', lifts.map(l => l.exercise));
+  const idBy = Object.fromEntries((ex || []).map(e => [e.name, e.id]));
+  const d = new Date(), days = [d.toLocaleDateString('en-CA'), d.toISOString().slice(0, 10)];
+  const { data: ck } = await sb.from('readiness_checkins').select('member_id').in('checkin_date', days);
+  const ids = [...new Set((ck || []).map(c => c.member_id))];
+  let rows = [];
+  if (ids.length) {
+    const { data: ms } = await sb.from('members').select('id,first_name,last_name').in('id', ids);
+    const exIds = lifts.map(l => idBy[l.exercise]).filter(Boolean);
+    let h = [];
+    if (exIds.length) { const r = await sb.from('set_logs').select('member_id,exercise_id,weight,reps,workout_log_id,created_at').in('member_id', ids).in('exercise_id', exIds).order('created_at', { ascending: false }).limit(3000); h = r.data || []; }
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const best = {}, wl = {};
+    h.forEach(r => { if (new Date(r.created_at) >= t0) return; const k = r.member_id + '|' + r.exercise_id;
+      if (!(k in wl)) wl[k] = r.workout_log_id; if (wl[k] !== r.workout_log_id) return;
+      if (!best[k] || +r.weight > +best[k].weight) best[k] = r; });
+    rows = (ms || []).sort((a, b) => a.first_name.localeCompare(b.first_name)).map(m => ({ name: `${m.first_name} ${(m.last_name || '').slice(0, 1)}.`,
+      vals: lifts.map(l => { const b = best[m.id + '|' + idBy[l.exercise]]; return b ? `${+b.weight} × ${b.reps}` : '<span class="ltnew">New</span>'; }) }));
+  }
+  __lt = { lifts, rows };
+  if (pages[pageIdx] && pages[pageIdx].last) draw();
+} catch (e) { console.log('loadLast', e); } }
+function fitLT(){ const L = document.getElementById('lifts'), T = L && L.querySelector('.lt'); if (!T) return; let k = 1.6; L.style.setProperty('--lk', k);
+  while ((L.scrollHeight > L.clientHeight + 2 || T.scrollWidth > T.parentElement.clientWidth + 2) && k > 0.4) { k -= 0.04; L.style.setProperty('--lk', k.toFixed(2)); } }
+new MutationObserver(() => requestAnimationFrame(fitLT)).observe(document.getElementById('lifts'), { childList: true });
+setTimeout(loadLast, 2500); setInterval(loadLast, 60000);
+(function(){ const st = document.createElement('style');
+  st.textContent = '.ltwrap{overflow:hidden}.lt{width:100%;border-collapse:separate;border-spacing:0 calc(.7vh*var(--lk,1))}.lt th{font-family:"Bebas Neue";font-size:calc(2.4vh*var(--lk,1));letter-spacing:.04em;text-align:left;opacity:.75;padding:0 1vw;font-weight:400}.lt th b{color:var(--red);font-weight:400}.lt td{background:var(--card);font-family:"Bebas Neue";font-size:calc(3.6vh*var(--lk,1));letter-spacing:.03em;padding:calc(.8vh*var(--lk,1)) 1vw;white-space:nowrap}.lt td.ltn{border-left:.6vh solid var(--red);border-radius:1vh 0 0 1vh}.lt td:last-child{border-radius:0 1vh 1vh 0}.ltnew{opacity:.45}';
+  document.head.appendChild(st); })();
 </script>
 </body></html>
