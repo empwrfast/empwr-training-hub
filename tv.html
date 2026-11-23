@@ -77,6 +77,19 @@ main{margin-top:1.5vh}
 .lift .n:empty{display:none}
 #lifts.many{grid-template-rows:auto repeat(6,minmax(0,1fr)) auto;height:100%}
 #lifts.many .lift .ex{white-space:normal;line-height:1.1}
+/* warm-up (RELEASE) layout */
+.coachnote{font-size:2vh;font-style:italic;opacity:.7;margin:.2vh 0 .4vh}
+.foam{background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:4vh;letter-spacing:.04em;border-radius:1vh;padding:1vh 1.4vw}
+body.dark .foam{background:var(--card)}
+.setlbl{font-family:'Mr Dafoe';color:var(--red);font-size:4.4vh;line-height:1;margin:.8vh 0 .2vh}
+.wucols{display:grid;grid-template-columns:1fr 1fr;gap:2vw;min-height:0}
+.wusec{display:flex;flex-direction:column;gap:.8vh}
+.wuh{background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:2.8vh;letter-spacing:.08em;border-radius:.8vh;padding:.5vh 1vw}
+.wuh b{color:var(--red);margin-right:.6vw}
+body.dark .wuh{background:var(--card)}
+.wu{background:var(--card);border-left:.6vh solid var(--red);border-radius:1vh;padding:1vh 1vw;display:flex;justify-content:space-between;align-items:center;gap:1vw}
+.wn{font-family:'Bebas Neue';font-size:3.1vh;line-height:1.05}
+.wr{font-family:'Bebas Neue';font-size:2.7vh;color:var(--red);white-space:nowrap}
 </style></head>
 <body>
 <header>
@@ -158,20 +171,33 @@ function groupHtml(list, card){
 // Blank sets/reps = same as the exercise before it in the block
 function fillReps(list){
   list.forEach((r,i)=>{ const reps = String(r.reps||'').split('|').pop().trim();
-    if (r.tempo && !r.sets && !reps && i > 0){ r.sets = list[i-1].sets; r.reps = list[i-1].reps; } });
+    if (r.tempo && !WU.test(r.tempo) && !r.sets && !reps && i > 0){ r.sets = list[i-1].sets; r.reps = list[i-1].reps; } });
+}
+// Warm-up: coach note, foam roll, then the set split into two sections
+const WU = /^(COACH|FOAM|SET|TURF|FLOOR)$/;
+function releaseHtml(list){
+  const by = t => list.filter(r => (r.tempo||'') === t);
+  const crawlLast = (a,b) => /KOMODO|CRAWL/i.test(a.exercise) - /KOMODO|CRAWL/i.test(b.exercise);
+  const rest = list.filter(r => !WU.test(r.tempo||''));
+  const row = r => `<div class="wu"><span class="wn">${r.exercise}</span><span class="wr">${scheme(r)||''}</span></div>`;
+  const sec = (n, title, rows) => rows.length ? `<div class="wusec"><div class="wuh"><b>${n}</b>${title}</div>${rows.map(row).join('')}</div>` : '';
+  return by('COACH').map(c=>`<div class="coachnote">Coach note: ${c.exercise}</div>`).join('') +
+    by('FOAM').map(f=>`<div class="foam">${f.exercise.replace(/\s*-->\s*/g,' → ').replace(/➡️/g,'→')}</div>`).join('') +
+    by('SET').map(s=>`<div class="setlbl">${s.exercise}</div>`).join('') +
+    `<div class="wucols">${sec(1,'Turf Drills', by('TURF'))}${sec(2,'Lunges, Hips + Crawl', by('FLOOR').sort(crawlLast).concat(rest))}</div>`;
 }
 function draw(){
   const el = document.getElementById('lifts');
   if (!pages.length){ el.innerHTML = '<div class="empty">No session programmed for today.</div>'; return; }
   if (pageIdx >= pages.length) pageIdx = 0;
   const pg = pages[pageIdx];
-  el.classList.toggle('many', pg.items.length > 6);
+  el.classList.toggle('many', pg.items.length > 6 && pg.nm !== 'RELEASE');
   el.innerHTML =
     `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.q}</span></div>`+
     `<span class="tm">${pg.tm ? pg.tm+' min' : ''}</span></div>`+
-    groupHtml(pg.items, (r,gap)=>`<div class="lift${gap?' gap':''}"><div class="n">${r.tempo||''}</div>
+    (pg.nm === 'RELEASE' ? releaseHtml(pg.items) : groupHtml(pg.items, (r,gap)=>`<div class="lift${gap?' gap':''}"><div class="n">${r.tempo||''}</div>
       <div><div class="ex">${r.exercise}</div></div>
-      <div class="scheme">${scheme(r)}</div></div>`)+
+      <div class="scheme">${scheme(r)}</div></div>`))+
     `<div id="navrow"><button class="nb" data-d="-1">‹</button>${pages.map((_,j)=>`<span class="dot${j===pageIdx?' on':''}" data-j="${j}"></span>`).join('')}<button class="nb" data-d="1">›</button></div>`;
   el.querySelectorAll('.dot').forEach(d=>d.onclick=()=>{ pageIdx = +d.dataset.j; draw(); });
   el.querySelectorAll('.nb').forEach(b=>b.onclick=()=>go(+b.dataset.d));
