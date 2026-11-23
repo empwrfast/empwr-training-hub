@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EMPWR Coach Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--ink:#12161F;--red:#EB5345;--bg:#fff;--fg:#12161F;--card:#F3F4F6;--line:#D9DCE1;--mute:#8a8f98}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:Montserrat,sans-serif;max-width:1000px;margin:auto;padding:16px 16px 120px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+header img{height:44px}
+h1{font-family:'Bebas Neue';font-size:40px;letter-spacing:.04em;line-height:1}
+h2{font-family:'Mr Dafoe';font-weight:400;font-size:34px;margin:-4px 0 10px}
+.card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}
+input{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--fg)}
+button{font:inherit;cursor:pointer}
+.main{font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;width:100%;padding:12px;border:0;border-radius:10px;background:var(--red);color:#fff;margin-top:10px}
+.main:disabled{opacity:.5}
+.hidden{display:none!important}
+#results button{display:block;width:100%;text-align:left;padding:12px;margin-top:6px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:600}
+#chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{background:var(--ink);color:#fff;border:0;border-radius:20px;padding:8px 14px;font-weight:600}
+.chip::after{content:' ✕';opacity:.6}
+#tabs{display:flex;gap:8px;overflow-x:auto;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+#tabs button{flex:1 0 auto;font-family:'Bebas Neue';font-size:20px;letter-spacing:.05em;padding:10px 14px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--fg)}
+#tabs button.on{background:var(--red);border-color:var(--red);color:#fff}
+.band{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:10px;padding:8px 14px;margin-top:6px}
+.band .nm{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em}
+.band .q{font-family:'Mr Dafoe';font-size:28px;margin-left:12px}
+.ex{border-left:6px solid var(--line)}
+.exhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.exhead h3{font-family:'Bebas Neue';font-size:26px;letter-spacing:.03em}
+.exhead .lbl{color:var(--mute);margin-right:8px}
+.exhead b{font-family:'Bebas Neue';font-size:22px;white-space:nowrap}
+.mrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
+.mrow:first-of-type{border-top:0}
+.who{font-weight:800;font-size:15px}
+.who small{display:block;font-weight:400;font-size:12px;color:var(--mute);margin-top:3px}
+.sets{display:flex;flex-wrap:wrap;gap:8px}
+.st{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 6px}
+.st span{font-family:'Bebas Neue';font-size:18px;color:var(--mute);width:16px;text-align:center}
+.st input{width:70px;padding:8px 6px;font-size:17px;text-align:center;border:0;background:var(--card)}
+.st input[data-r]{width:52px}
+.st i{font-style:normal;color:var(--mute)}
+.same{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:10px;padding:0 12px;font-weight:700;font-size:13px}
+.st input[data-w]::placeholder{color:#b5b9c0}
+.plus{border:1px dashed var(--line);background:none;border-radius:10px;padding:0 12px;font-weight:700;color:var(--mute)}
+.mtot{font-size:12px;color:var(--mute);margin-top:6px}
+.chz{font-family:'Bebas Neue';font-size:20px;letter-spacing:.08em;margin:14px 0 -4px}
+#bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px}
+#bar .in{max-width:1000px;margin:auto}
+.res{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+.ok{color:#2FA84F;font-weight:800}.bad{color:var(--red);font-weight:800}
+</style></head>
+<body>
+<header>
+  <img src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
+</header>
+
+<!-- STEP 1: pick members -->
+<section id="stepPick">
+  <h1>Coach Board</h1><h2>Who Are You Logging For?</h2>
+  <div class="card">
+    <input id="search" placeholder="Type a member's name" autocomplete="off">
+    <div id="results"></div>
+    <div id="chips"></div>
+  </div>
+  <button class="main" id="startBtn" disabled>Start Logging</button>
+</section>
+
+<!-- STEP 2: board -->
+<section id="stepBoard" class="hidden">
+  <h1 id="title">Today's Lift</h1><h2 id="sub"></h2>
+  <div id="board"></div>
+  <div id="bar"><div class="in"><button class="main" id="saveAll" style="margin:0">Save All</button></div></div>
+</section>
+
+<!-- STEP 3: done -->
+<section id="stepDone" class="hidden">
+  <h1>Saved</h1><h2>Nice Work, Coach.</h2>
+  <div class="card" id="done"></div>
+  <button class="main" onclick="location.reload()">Log Another Group</button>
+</section>
+
+<script>
+const sb = supabase.createClient("https://utljgnuieyjdqclfiwqz.supabase.co", "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3", { db: { schema: 'sgpt' } });
+const $ = id => document.getElementById(id);
+const show = id => ['stepPick','stepBoard','stepDone'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+const fmt = n => Math.round(n).toLocaleString('en-CA');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tc = x => x === x.toUpperCase() ? x.toLowerCase().replace(/(^|\s|&)(\w)/g, (m,a,b) => a + b.toUpperCase()) : x;
+let picked = [], items = [], last = {};   // last[memberId][exerciseId] = [{weight,reps}...]
+
+// ===== STEP 1 =====
+let t; $('search').oninput = e => { clearTimeout(t); t = setTimeout(async () => {
+  const q = e.target.value.trim(); if (q.length < 2) { $('results').innerHTML = ''; return; }
+  const { data } = await sb.from('members').select('id,first_name,last_name').eq('active', true)
+    .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(8);
+  $('results').innerHTML = (data || []).filter(m => !picked.some(p => p.id === m.id))
+    .map(m => `<button data-id="${m.id}" data-n="${esc(m.first_name)} ${esc(m.last_name)}">${esc(m.first_name)} ${esc(m.last_name)}</button>`).join('');
+}, 250); };
+$('results').onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  picked.push({ id: b.dataset.id, name: b.dataset.n }); $('search').value = ''; $('results').innerHTML = ''; drawChips(); $('search').focus(); };
+$('chips').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; picked = picked.filter(p => p.id !== b.dataset.id); drawChips(); };
+function drawChips(){ $('chips').innerHTML = picked.map(p => `<button class="chip" data-id="${p.id}">${p.name}</button>`).join('');
+  $('startBtn').disabled = !picked.length; $('startBtn').textContent = picked.length ? `Start Logging (${picked.length})` : 'Start Logging'; }
+$('startBtn').onclick = load;
+
+// ===== STEP 2 =====
+const repsOf = it => String(it.reps || '').split('|').pop().trim();
+const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets > 1 ? 's' : ''}`) : repsOf(it);
+const isLift = it => it.sets && !/^(RELEASE|REACTIVE|RUN|RESILIENCY)/i.test((it.intensity || '').trim()) && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo || '');
+
+async function load(){
+  $('startBtn').disabled = true; $('startBtn').textContent = 'Loading...';
+  const { data } = await sb.from('todays_session').select('*').order('item_order');
+  items = data || [];
+  if (!items.length) { $('board').innerHTML = '<div class="card">No session programmed for today.</div>'; show('stepBoard'); return; }
+  // blank sets/reps = same as the exercise before it in the block
+  items.forEach((it, i) => { const pv = items[i - 1];
+    if (pv && it.tempo && !it.sets && !repsOf(it) && pv.intensity === it.intensity) { it.sets = pv.sets; it.reps = pv.reps; } });
+  const { data: ex } = await sb.from('exercises').select('id,name').in('name', items.map(i => i.exercise));
+  const idBy = Object.fromEntries((ex || []).map(e => [e.name, e.id]));
+  items.forEach(i => i.exercise_id = idBy[i.exercise]);
+  const ids = items.map(i => i.exercise_id).filter(Boolean);
+  // each member's last session for each exercise, set by set
+  const { data: hist } = await sb.from('set_logs').select('member_id,exercise_id,set_number,weight,reps,workout_log_id,created_at')
+    .in('member_id', picked.map(p => p.id)).in('exercise_id', ids).order('created_at', { ascending: false }).limit(3000);
+  last = {}; const wlOf = {};
+  (hist || []).forEach(r => { const k = r.member_id + '|' + r.exercise_id;
+    if (!(k in wlOf)) wlOf[k] = r.workout_log_id;
+    if (wlOf[k] === r.workout_log_id) ((last[r.member_id] ||= {})[r.exercise_id] ||= []).push(r); });
+  Object.values(last).forEach(m => Object.values(m).forEach(a => a.sort((x, y) => x.set_number - y.set_number)));
+
+  const t0 = (items[0].title || '').trim();
+  $('title').textContent = tc(t0.split('--').pop().replace(/\[.*?\]/g, '').trim()) || "Today's Lift";
+  $('sub').textContent = `Week ${items[0].week} · ${picked.map(p => p.name.split(' ')[0]).join(', ')}`;
+
+  // blocks, same grouping as the TV
+  const blocks = []; let cur = null;
+  items.forEach((it, idx) => { if (!isLift(it)) return;
+    const raw = (it.intensity || '').replace(/\s+/g, ' ').trim();
+    if (!cur || cur.raw !== raw) { const nm = raw.replace(/\[.*?\]/g, '').trim().split(' ')[0];
+      cur = { raw, nm, q: tc((raw.match(/\[(.*?)\]/) || [])[1] || ''), idx: [] }; blocks.push(cur); }
+    cur.idx.push(idx); });
+
+  const setBox = (s, w, r) => `<div class="st"><span>${s}</span><input type="number" inputmode="decimal" placeholder="${w || 'lb'}" data-w><i>×</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r></div>`;
+  const card = idx => { const it = items[idx], n = Math.max(1, it.sets || 3), mult = /\de\b/i.test(repsOf(it)) ? 2 : 1;
+    return `<div class="card ex" data-idx="${idx}" data-mult="${mult}">
+      <div class="exhead"><h3><span class="lbl">${esc(it.tempo || '')}</span>${esc(it.exercise)}</h3><b>${esc(schemeOf(it))}</b></div>
+      ${picked.map(p => { const L = (last[p.id] || {})[it.exercise_id];
+        const w = s => { if (!L) return ''; const x = L[s] || L[L.length - 1]; return x && x.weight ? +x.weight : ''; };
+        return `<div class="mrow" data-m="${p.id}"><div class="who">${p.name.split(' ')[0]} ${p.name.split(' ').slice(1).join(' ').slice(0,1)}.<small>${L ? 'Last: ' + L.map(x => `${+x.weight}×${x.reps}`).join(', ') : 'No history yet'}</small></div>
+          <div><div class="sets">${Array.from({ length: n }, (_, s) => setBox(s + 1, w(s), parseInt(repsOf(it)) || '')).join('')}<button class="plus" title="Add a set">+</button>${L ? '<button class="same">Same As Last</button>' : ''}</div><div class="mtot"></div></div></div>`; }).join('')}
+    </div>`; };
+  const blockHtml = b => { let h = ''; const L = b.idx;
+    for (let k = 0; k < L.length; k++) { const lbl = items[L[k]].tempo;
+      if (lbl && items[L[k + 1]] && items[L[k + 1]].tempo === lbl && L[k + 1] !== undefined) {
+        h += `<div class="chz">Choose 1 (fill in whichever they did)</div>`; }
+      h += card(L[k]); }
+    return h; };
+
+  $('board').innerHTML = `<div id="tabs">${blocks.map((b, i) => `<button data-b="${i}">${b.nm}</button>`).join('')}</div>` +
+    blocks.map((b, i) => `<div class="blk" data-b="${i}"><div class="band"><div><span class="nm">${b.nm}</span><span class="q">${b.q}</span></div></div>${blockHtml(b)}</div>`).join('');
+  const showBlock = i => { document.querySelectorAll('.blk').forEach(el => el.classList.toggle('hidden', +el.dataset.b !== i));
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.b === i)); scrollTo(0, 0); };
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showBlock(+b.dataset.b));
+  showBlock(0); show('stepBoard'); totals();
+}
+
+// grey numbers = last time; tap Same As Last to drop them in
+$('board').addEventListener('click', e => { const b = e.target.closest('.same'); if (!b) return;
+  b.parentElement.querySelectorAll('[data-w]').forEach(i => { if (!i.value && /\d/.test(i.placeholder)) i.value = i.placeholder; }); totals(); });
+// add a set for one member (copies their last set)
+$('board').addEventListener('click', e => { const b = e.target.closest('.plus'); if (!b) return;
+  const sets = b.parentElement, all = sets.querySelectorAll('.st'), lastSt = all[all.length - 1];
+  const w = lastSt ? lastSt.querySelector('[data-w]').value : '', r = lastSt ? lastSt.querySelector('[data-r]').value : '';
+  b.insertAdjacentHTML('beforebegin', `<div class="st"><span>${all.length + 1}</span><input type="number" inputmode="decimal" placeholder="lb" value="${w}" data-w><i>×</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r></div>`); totals(); });
+$('board').addEventListener('input', totals);
+
+// pounds moved per member per exercise
+function totals(){ document.querySelectorAll('.ex').forEach(card => { const m = +card.dataset.mult || 1;
+  card.querySelectorAll('.mrow').forEach(row => { let v = 0; row.querySelectorAll('.st').forEach(st => {
+    const w = parseFloat(st.querySelector('[data-w]').value), r = parseInt(st.querySelector('[data-r]').value); if (w && r) v += w * r * m; });
+    row.querySelector('.mtot').textContent = v ? `Total Moved: ${fmt(v)} lb` : ''; }); }); }
+
+// ===== SAVE ALL =====
+$('saveAll').onclick = async () => {
+  // only sets with a weight typed in (or dropped in) get saved
+  const per = {}; picked.forEach(p => per[p.id] = { sets: [], lb: 0 });
+  document.querySelectorAll('.ex').forEach(card => { const it = items[+card.dataset.idx], m = +card.dataset.mult || 1;
+    card.querySelectorAll('.mrow').forEach(row => { let n = 0; row.querySelectorAll('.st').forEach(st => {
+      const w = parseFloat(st.querySelector('[data-w]').value), r = parseInt(st.querySelector('[data-r]').value);
+      if (w && r && it.exercise_id) { per[row.dataset.m].sets.push({ exercise_id: it.exercise_id, set_number: ++n, weight: w, reps: r }); per[row.dataset.m].lb += w * r * m; } }); }); });
+  const todo = picked.filter(p => per[p.id].sets.length);
+  if (!todo.length) { alert('Nothing to save yet. Enter at least one set.'); return; }
+  if (!confirm(`Save for ${todo.map(p => p.name.split(' ')[0]).join(', ')}?`)) return;
+  $('saveAll').disabled = true; $('saveAll').textContent = 'Saving...';
+  const out = [];
+  for (const p of todo) {
+    const { data: wl, error } = await sb.from('workout_logs').insert({ member_id: p.id, session_id: items[0].session_id,
+      entered_by: 'coach', notes: JSON.stringify({ source: 'coach board' }) }).select().single();
+    if (error) { out.push(`<div class="res"><span>${p.name}</span><span class="bad">Not saved, try again</span></div>`); continue; }
+    const { error: e2 } = await sb.from('set_logs').insert(per[p.id].sets.map(s => ({ ...s, workout_log_id: wl.id, member_id: p.id })));
+    out.push(`<div class="res"><span>${p.name}</span><span class="${e2 ? 'bad' : 'ok'}">${e2 ? 'Sets not saved' : `✓ ${fmt(per[p.id].lb)} lb moved`}</span></div>`);
+  }
+  $('done').innerHTML = out.join(''); show('stepDone'); scrollTo(0, 0);
+};
+</script>
+</body></html>
