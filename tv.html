@@ -365,8 +365,8 @@ async function loadLast(){ try {
   __lt = { lifts, rows };
   if (pages[pageIdx] && pages[pageIdx].last) draw();
 } catch (e) { console.log('loadLast', e); } }
-function fitLT(){ const L = document.getElementById('lifts'), T = L && L.querySelector('.lt'); if (!T) return; let k = 1.6; L.style.setProperty('--lk', k);
-  while ((L.scrollHeight > L.clientHeight + 2 || T.scrollWidth > T.parentElement.clientWidth + 2) && k > 0.4) { k -= 0.04; L.style.setProperty('--lk', k.toFixed(2)); } }
+function fitLT(){ const L = document.getElementById('lifts'), T = L && L.querySelector('.lt'); if (!T) return; const W = T.parentElement; let k = 1.6; L.style.setProperty('--lk', k);
+  while ((W.scrollHeight > W.clientHeight + 2 || T.scrollWidth > W.clientWidth + 2) && k > 0.4) { k -= 0.04; L.style.setProperty('--lk', k.toFixed(2)); } }
 new MutationObserver(() => requestAnimationFrame(fitLT)).observe(document.getElementById('lifts'), { childList: true });
 setTimeout(loadLast, 2500); setInterval(loadLast, 60000);
 (function(){ const st = document.createElement('style');
