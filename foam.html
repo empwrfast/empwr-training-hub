@@ -28,6 +28,8 @@ header .cd b{font-size:6.5vh;color:var(--red);font-weight:400}
 .novid{height:100%;display:grid;place-items:center;color:#fff;font-family:'Bebas Neue';font-size:7vh;letter-spacing:.05em}
 .stp{background:var(--red);color:#fff;border-radius:1vh;padding:.2vh 1vw;margin-right:1vw;font-size:4.4vh;vertical-align:middle}
 .nt{background:var(--onyx);color:#fff;border-radius:1vh;padding:.3vh 1vw;margin-left:1vw;font-size:3.4vh;vertical-align:middle;letter-spacing:.06em}
+#grid.solo{grid-template-columns:1fr;grid-template-rows:1fr}
+#grid.solo .tile{grid-column:1 / -1;width:min(100%,60vh);justify-self:center}
 #idle{position:fixed;inset:0;border:0;width:100%;height:100%;display:none}
 </style></head>
 <body>
@@ -39,57 +41,60 @@ header .cd b{font-size:6.5vh;color:var(--red);font-weight:400}
   </header>
   <div id="grid"></div>
 </section>
-<iframe id="idle" title="Today's lift"></iframe>
 <script>
-// Videos from the EMPWR Exercise Video Library, in the order members do them
-const PAGES = [
-  { title: 'Foam Roll', note: 'Then Stretch →', vids: [['Glutes','dqq7NiCjcO4'],['Calves','Z9Bzmqm8HXQ'],['Quads','r-P6UQabO0k'],['Groin','JR3xEW2Pr9M'],['Lats','kZna7n_WL1A']] },
-  // Lat Hang: YouTube Short LRGdq9KSwJs (null = name only, no video)
-  { title: 'Stretch', note: 'After Foam Roll', vids: [['Chest with Breathing','L4ofq3j4ZDc'],['Lat Hang','LRGdq9KSwJs'],['Hip Flexor','7CU2rovveHM']] }
-];
+// Videos from the EMPWR Exercise Video Library / Rich's channel
+const SCREENS = {
+  foam:  { step: 'Step 1', title: 'Foam Roll', note: 'Then Hip Flexor →',
+           vids: [['Glutes','dqq7NiCjcO4'],['Calves','Z9Bzmqm8HXQ'],['Quads','r-P6UQabO0k'],['Groin','JR3xEW2Pr9M'],['Lats','kZna7n_WL1A']] },
+  hip:   { step: 'Step 2', title: 'Hip Flexor Stretch', note: 'After Foam Roll',
+           vids: [['1/2 Kneeling Hip Flexor, Wall + Reach','7CU2rovveHM']] },
+  cool:  { step: 'Cooldown', title: 'Stretch', note: 'End Of Session',
+           vids: [['Chest with Breathing','L4ofq3j4ZDc'],['Lat Hang','LRGdq9KSwJs'],['Hip Flexor','7CU2rovveHM']] }
+};
 const P = new URLSearchParams(location.search);
-// Plays all day. Add ?schedule to only play around session starts (then shows the workout in between)
-const SCHEDULED = P.has('schedule');
+// Session start times (24h). Change with ?times=7:00,8:00,17:00
 const TIMES = (P.get('times') || '7:00,8:00,11:30,12:30,17:00,18:00').split(',')
-  .map(t => { const [h,m] = t.trim().split(':').map(Number); return h*60 + (m||0); });
-const BEFORE = +(P.get('before') || 10), AFTER = +(P.get('after') || 5);
-const ROTATE = +(P.get('rotate') || 90);   // seconds per screen
-const IDLE = P.get('idle') || 'tv.html';
+  .map(t => { const [h,m] = t.trim().split(':').map(Number); return h*60 + (m||0); }).sort((x,y)=>x-y);
+// Timeline around each session start (minutes)
+const FOAM_BEFORE = 10, HIP_AFTER = 5, COOL_FROM = 50, LEN = 60;
 const pad = n => String(Math.floor(n)).padStart(2,'0');
 const embed = id => `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0&playsinline=1&modestbranding=1`;
-let active = null, page = 0, shownPage = -1, since = Date.now();
+let shown = null;
 
-function inWindow(){
+// What should be on screen right now
+function now(){
   const d = new Date(), m = d.getHours()*60 + d.getMinutes() + d.getSeconds()/60;
-  for (const t of TIMES) if (m >= t - BEFORE && m < t + AFTER) return { t, m };
-  return null;
+  for (const t of TIMES){
+    const next = TIMES.find(x => x > t);
+    const backToBack = next !== undefined && next - t <= LEN;
+    const coolEnd = backToBack ? next - 5 : t + LEN;           // leave 5 min of foam roll for the next group
+    if (m >= t && m < t + HIP_AFTER) return { key:'hip', t, m };
+    if (m >= t + COOL_FROM && m < coolEnd) return { key:'cool', t, m };
+  }
+  for (const t of TIMES) if (m >= t - FOAM_BEFORE && m < t) return { key:'foam', t, m };
+  return { key:'foam', t:null, m };                             // all day: foam roll
 }
-function drawPage(){
-  const pg = PAGES[page];
-  document.getElementById('pt').innerHTML = `<span class="stp">Step ${page+1}</span>${pg.title}<span class="nt">${pg.note||''}</span>`;
-  document.getElementById('ps').textContent = pg.vids.map(v=>v[0]).join(' → ');
-  document.getElementById('grid').innerHTML = pg.vids.map((v,i)=>
+function draw(key){
+  const pg = SCREENS[key];
+  document.getElementById('pt').innerHTML = `<span class="stp">${pg.step}</span>${pg.title}<span class="nt">${pg.note}</span>`;
+  document.getElementById('ps').textContent = pg.vids.length > 1 ? pg.vids.map(v=>v[0]).join(' → ') : '';
+  const g = document.getElementById('grid');
+  g.innerHTML = pg.vids.map((v,i)=>
     `<div class="tile"><div class="lbl"><b>${i+1}</b>${v[0]}</div><div class="vw">${v[1] ? `<iframe src="${embed(v[1])}" allow="autoplay; encrypted-media" title="${pg.title} ${v[0]}"></iframe>` : `<div class="novid">${v[0]}</div>`}</div></div>`).join('');
-  document.getElementById('grid').classList.toggle('one', pg.vids.length <= 3);
-  shownPage = page;
+  g.className = pg.vids.length === 1 ? 'solo' : pg.vids.length <= 3 ? 'one' : '';
+  shown = key;
 }
 function tick(){
-  const w = inWindow(), on = !SCHEDULED || !!w;
-  if (on !== active){
-    active = on;
-    document.getElementById('foam').style.display = on ? 'flex' : 'none';
-    if (on) { since = Date.now(); drawPage(); } else { document.getElementById('grid').innerHTML = ''; shownPage = -1; }
-    const f = document.getElementById('idle');
-    f.style.display = on ? 'none' : 'block';
-    if (!on && IDLE !== 'none' && !f.src) f.src = IDLE;
-  }
-  if (on && Date.now() - since >= ROTATE*1000){ page = (page + 1) % PAGES.length; since = Date.now(); drawPage(); }
-  document.getElementById('cdbox').style.visibility = w ? 'visible' : 'hidden';
-  if (w){
-    const diff = (w.t - w.m) * 60, s = Math.abs(diff);
+  const s = now();
+  if (s.key !== shown) draw(s.key);
+  const box = document.getElementById('cdbox');
+  if (s.t !== null && (s.key === 'foam' || s.key === 'hip')){
+    const diff = (s.t - s.m) * 60, x = Math.abs(diff);
+    box.style.visibility = 'visible';
     document.getElementById('cdl').textContent = diff > 0 ? 'Session starts in' : 'Session started';
-    document.getElementById('cd').textContent = `${pad(s/60)}:${pad(s%60)}`;
-  }
+    document.getElementById('cd').textContent = `${pad(x/60)}:${pad(x%60)}`;
+  } else box.style.visibility = 'hidden';
 }
+document.getElementById('foam').style.display = 'flex';
 tick(); setInterval(tick, 1000);
 </script></body></html>
