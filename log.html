@@ -269,6 +269,8 @@ async function loadSession(){
         <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(repsOf(it))||''}" data-r></div>`).join('')}
     </div>`; };
 
+  // Members only log from the lift on: warm-up, reactive and run are coach-led
+  { const k = blocks.findIndex(b => !/^(RELEASE|REACTIVE|RUN)/i.test(b.nm)); if (k > 0) blocks.splice(0, k); }
   $('exList').innerHTML =
     `<div id="tabs">${blocks.map((b,i)=>`<button data-b="${i}">${b.nm}${/intro/i.test(b.q)?' Intro':''}</button>`).join('')}</div>` +
     blocks.map((b,i)=>`<div class="blk" data-b="${i}">
