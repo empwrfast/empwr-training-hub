@@ -64,6 +64,9 @@ body{max-width:900px}
 .blknav button{flex:1;font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;padding:14px;border-radius:10px;cursor:pointer;border:2px solid var(--line);background:var(--bg);color:var(--fg)}
 .blknav button.go{background:var(--ink);border-color:var(--ink);color:#fff}
 .set input{font-size:20px;padding:14px}
+.vol{margin-top:6px;font-size:14px;text-align:right}.vol b{font-size:16px}
+#wtotal{font-family:'Bebas Neue';font-size:26px;letter-spacing:.04em;text-align:center;margin:14px 0 8px}
+.sumbox{background:var(--card);border-radius:10px;padding:12px 14px;margin:10px 0}.sumh{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;margin-bottom:6px}.sumr{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}.sumr.tot{border:0;font-family:'Bebas Neue';font-size:24px;padding-top:8px}
 .addset{background:none;border:1px dashed var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;font-family:Montserrat,sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin:4px 0 0}
 .exnote{margin-top:8px;font-size:15px;padding:10px 12px;border-style:dashed}
 .wset{display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;align-items:center;margin:6px 0;opacity:.75}.wset span{font-family:'Bebas Neue';font-size:18px;text-align:center;color:#8a8f98}.wset input{font-size:18px;padding:10px;border-style:dashed}
@@ -139,10 +142,20 @@ const cardioHtml = it => { const n = it.exercise, u = unitFor(n);
   const tm = /treadmill|woodway|4\s*front|true\s*form/i.test(n), incl = /treadmill|woodway|4\s*front/i.test(n);
   const spd = u==='mi' ? 'mph' : 'km/h';
   return `<div class="cardio"><label>Time<input type="text" inputmode="numeric" placeholder="min:sec" data-c="time"></label><label>Distance<span class="du"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('')}</select></span></label>${tm ? `<label>Speed (${spd})<input type="number" inputmode="decimal" placeholder="${spd}" data-c="speed"></label>${incl ? `<label>Incline %<input type="number" inputmode="decimal" placeholder="%" data-c="incline"></label>` : `<label>Calories<input type="number" inputmode="numeric" placeholder="cal" data-c="cals"></label>`}` : /echo|bike/i.test(n) ? `<label>Avg Watts<input type="number" inputmode="numeric" placeholder="W" data-c="watts"></label><label>Max Watts<input type="number" inputmode="numeric" placeholder="W" data-c="max_watts"></label><label>Cadence (rpm)<input type="number" inputmode="numeric" placeholder="rpm" data-c="cadence"></label><label>Calories<input type="number" inputmode="numeric" placeholder="cal" data-c="cals"></label>` : `<label>Avg Watts<input type="number" inputmode="numeric" placeholder="W" data-c="watts"></label><label>Calories<input type="number" inputmode="numeric" placeholder="cal" data-c="cals"></label>`}</div>`; };
+// pounds moved: weight x reps on working sets (warm-ups not counted), x2 for each-side reps
+const fmt = n => Math.round(n).toLocaleString('en-CA');
+function updVol(){ let total = 0; const rows = [];
+  document.querySelectorAll('.ex[data-mult]').forEach(card => { const m = +card.dataset.mult || 1; let v = 0;
+    card.querySelectorAll('.set').forEach(r => { const w = parseFloat(r.querySelector('[data-w]').value), n = parseInt(r.querySelector('[data-r]').value); if (w && n) v += w * n * m; });
+    const el = card.querySelector('[data-vol]'); if (el) el.innerHTML = v ? `Total Moved: <b>${fmt(v)} lb</b>` : '';
+    if (v) { total += v; rows.push({name: items[+card.dataset.idx].exercise, lb: v}); } });
+  const t = $('wtotal'); if (t) t.innerHTML = total ? `Workout Total: <b>${fmt(total)} lb</b>` : '';
+  return {total, rows}; }
+document.addEventListener('input', e => { if (e.target.matches('.set input')) updVol(); });
 // extra working set: copies the last set's weight and reps
 document.addEventListener('click',e=>{ const b=e.target.closest('.addset'); if(!b) return; const rows=b.parentElement.querySelectorAll('.set'), lastRow=rows[rows.length-1];
   const w = lastRow ? lastRow.querySelector('[data-w]').value : '', r = lastRow ? lastRow.querySelector('[data-r]').value : '';
-  b.insertAdjacentHTML('beforebegin',`<div class="set"><span>${rows.length+1}</span><input type="number" inputmode="decimal" placeholder="lb" value="${w}" data-w><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r></div>`); });
+  b.insertAdjacentHTML('beforebegin',`<div class="set"><span>${rows.length+1}</span><input type="number" inputmode="decimal" placeholder="lb" value="${w}" data-w><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r></div>`); updVol(); });
 document.addEventListener('click',e=>{ const b=e.target.closest('.addwu'); if(!b) return; const box=b.previousElementSibling, n=box.children.length+1;
   box.insertAdjacentHTML('beforeend',`<div class="wset"><span>W${n}</span><input type="number" inputmode="decimal" placeholder="lb" data-w><input type="number" inputmode="numeric" placeholder="reps" data-r></div>`); });
 const show = id => ['stepWho','stepReady','stepSession'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
@@ -280,13 +293,13 @@ async function loadSession(){
     const mr = maxRule(it), w1 = wk1Max[it.exercise_id];
     const wFor = s => { if (mr && w1) return w1; if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? round5(x.weight*pct) : ''; };
     const rFor = s => { if (mr) { if (s === nSets-1) return ''; const x = L && (L.sets[s] || L.sets[L.sets.length-1]); return x ? x.reps : ''; } return parseInt(repsOf(it))||''; };
-    return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">${head}
+    return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}" data-mult="${/\de\b/i.test(repsOf(it)) ? 2 : 1}">${head}
       <div class="sugg">${mr ? `<div style="font-weight:700;margin-bottom:4px">${mr}${w1 ? ` Your Week 1 top weight: ${w1} lb.` : ''}</div>` : ''}${!lift ? '' : L ? `Last time: ${L.sets.map(x=>`${+x.weight} × ${x.reps}`).join(' · ')}${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
       ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${wFor(s)}" data-w>
         <input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? 'max reps' : 'reps'}" value="${rFor(s)}" data-r></div>`).join('')}
-      ${!lift ? '' : '<button class="addset">+ Add A Set</button>'}
+      ${!lift ? '' : '<div class="vol" data-vol></div><button class="addset">+ Add A Set</button>'}
       <input type="text" class="exnote" placeholder="Setup Note: Handle, Machine, Seat... (optional)" maxlength="140" value="${(lastNote[it.exercise_id]||'').replace(/"/g,'&quot;')}" data-note>
     </div>`; };
 
@@ -306,6 +319,8 @@ async function loadSession(){
   };
   document.querySelectorAll('#tabs button, .blknav button').forEach(b=>b.onclick=()=>showBlock(+(b.dataset.b ?? b.dataset.go)));
   showBlock(0);
+  if (!$('wtotal')) $('saveBtn').insertAdjacentHTML('beforebegin','<div id="wtotal"></div>');
+  updVol();
   show('stepSession');
 }
 
@@ -336,7 +351,9 @@ $('saveBtn').onclick = async () => {
   const today = new Date().toISOString().slice(0,10);
   const { data: newPr } = await sb.from('personal_records').select('pr_type,value,exercises(name)').eq('member_id',member.id).eq('achieved_on',today);
   const label = {heaviest:'Heaviest',est_5rm:'Est. 5RM',session_volume:'Volume'};
+  const vs = updVol();
   $('saved').innerHTML = `<h3>Saved. Nice Work, ${member.first}.</h3>` +
+    (vs.total ? `<div class="sumbox"><div class="sumh">Your Lift Summary</div>${vs.rows.map(r=>`<div class="sumr"><span>${r.name}</span><b>${fmt(r.lb)} lb</b></div>`).join('')}<div class="sumr tot"><span>Total Moved Today</span><b>${fmt(vs.total)} lb</b></div></div>` : '') +
     (newPr && newPr.length ? newPr.map(p=>`<div class="pr">🔥 New ${label[p.pr_type]} PR: ${p.exercises.name} ${p.value}</div>`).join('') : '<div>Logged. See you next session.</div>') +
     `<button class="main" onclick="location.reload()">Next Person</button>`;
   $('saved').classList.remove('hidden'); $('saveBtn').classList.add('hidden');
