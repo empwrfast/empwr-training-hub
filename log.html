@@ -187,7 +187,7 @@ async function loadSession(){
     cur.idx.push(idx);
   });
   const repsOf = it => String(it.reps||'').split('|').pop().trim();
-  const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} sets`) : repsOf(it);
+  const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets>1?'s':''}`) : repsOf(it);
 
   // Blank sets/reps = same as the exercise before it in the block
   blocks.forEach(b=>b.idx.forEach((ix,k)=>{ const it=items[ix];
