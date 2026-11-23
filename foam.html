@@ -30,6 +30,10 @@ header .cd b{font-size:6.5vh;color:var(--red);font-weight:400}
 .nt{background:var(--onyx);color:#fff;border-radius:1vh;padding:.3vh 1vw;margin-left:1vw;font-size:3.4vh;vertical-align:middle;letter-spacing:.06em}
 #grid.solo{grid-template-columns:1fr;grid-template-rows:1fr}
 #grid.solo .tile{grid-column:1 / -1;width:min(100%,60vh);justify-self:center}
+/* no YouTube controls: cover + crop the player */
+.vw{position:relative;overflow:hidden}
+.vw iframe{transform:scale(1.22);transform-origin:center}
+.vw::after{content:'';position:absolute;inset:0;z-index:2}
 /* big labels above each video, fits any TV */
 header{flex-wrap:nowrap;min-width:0}
 header .t{white-space:nowrap;font-size:6vh}
@@ -47,6 +51,7 @@ header .t{white-space:nowrap;font-size:6vh}
   </header>
   <div id="grid"></div>
 </section>
+<script src="https://www.youtube.com/iframe_api"></script>
 <script>
 // Videos from the EMPWR Exercise Video Library / Rich's channel
 const SCREENS = {
@@ -86,10 +91,31 @@ function draw(key){
   document.getElementById('ps').textContent = pg.vids.length > 1 ? pg.vids.map(v=>v[0]).join(' → ') : '';
   const g = document.getElementById('grid');
   g.innerHTML = pg.vids.map((v,i)=>
-    `<div class="tile"><div class="lbl"><b>${i+1}</b>${v[0]}</div><div class="vw">${v[1] ? `<iframe src="${embed(v[1])}" allow="autoplay; encrypted-media" title="${pg.title} ${v[0]}"></iframe>` : `<div class="novid">${v[0]}</div>`}</div></div>`).join('');
+    `<div class="tile"><div class="lbl"><b>${i+1}</b>${v[0]}</div><div class="vw">${v[1] ? `<div class="yt" data-id="${v[1]}"></div>` : `<div class="novid">${v[0]}</div>`}</div></div>`).join('');
   g.className = pg.vids.length === 1 ? 'solo' : pg.vids.length <= 3 ? 'one' : '';
   shown = key;
+  mountPlayers();
 }
+// YouTube players: muted, slowed down, restart just before the end so no pause/end screen shows
+const RATE = +(P.get('speed') || 0.75);
+let players = [];
+function mountPlayers(){
+  players.forEach(p => { try { p.destroy(); } catch(e){} }); players = [];
+  if (!(window.YT && YT.Player)) { window.onYouTubeIframeAPIReady = mountPlayers; return; }
+  document.querySelectorAll('.yt').forEach(el => {
+    players.push(new YT.Player(el, { videoId: el.dataset.id,
+      playerVars: { autoplay:1, mute:1, controls:0, rel:0, playsinline:1, modestbranding:1, disablekb:1, fs:0, iv_load_policy:3 },
+      events: {
+        onReady: e => { e.target.mute(); e.target.setPlaybackRate(RATE); e.target.playVideo(); },
+        onStateChange: e => { if (e.data === YT.PlayerState.ENDED || e.data === YT.PlayerState.PAUSED) { e.target.seekTo(0, true); e.target.playVideo(); } }
+      } }));
+  });
+}
+setInterval(() => players.forEach(p => { try {
+  const d = p.getDuration(), t = p.getCurrentTime();
+  if (d && t > d - 0.8) p.seekTo(0, true);
+  if (p.getPlaybackRate && p.getPlaybackRate() !== RATE) p.setPlaybackRate(RATE);
+} catch(e){} }), 300);
 function tick(){
   const s = now();
   if (s.key !== shown) draw(s.key);
