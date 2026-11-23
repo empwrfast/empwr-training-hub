@@ -37,7 +37,7 @@ header .cd b{font-size:6.5vh;color:var(--red);font-weight:400}
 /* 6 tiles: 3 + 3, and the after-foam-roll drill outlined in red */
 #grid.six .tile:nth-child(n){grid-column:span 2}
 .tile.after{outline:.6vh solid var(--red);outline-offset:-.6vh}
-.tile.after .lbl{background:var(--red);font-size:3.6vh;white-space:nowrap;overflow:hidden}
+.tile.after .lbl{background:var(--red);font-size:3vh;line-height:1.1}
 .tile.after .lbl b{background:#fff;color:var(--red)}
 /* big labels above each video, fits any TV */
 header{flex-wrap:nowrap;min-width:0}
@@ -60,8 +60,8 @@ header .t{white-space:nowrap;font-size:6vh}
 <script>
 // Videos from the EMPWR Exercise Video Library / Rich's channel
 const SCREENS = {
-  foam:  { step: 'Step 1', title: 'Foam Roll', note: 'Then #6 →',
-           vids: [['Glutes','dqq7NiCjcO4'],['Calves','Z9Bzmqm8HXQ'],['Quads','r-P6UQabO0k'],['Groin','JR3xEW2Pr9M'],['Lats','kZna7n_WL1A'],['Then: Hip Flexor, Foot On Wall','7CU2rovveHM','after']] },
+  foam:  { step: 'Step 1', title: 'Foam Roll', note: 'When Done Foam Rolling, #6 →',
+           vids: [['Glutes','dqq7NiCjcO4'],['Calves','Z9Bzmqm8HXQ'],['Quads','r-P6UQabO0k'],['Groin','JR3xEW2Pr9M'],['Lats','kZna7n_WL1A'],['When Done Foam Rolling: Hip Flexor, Foot On Wall','7CU2rovveHM','after']] },
   hip:   { step: 'Step 2', title: 'Hip Flexor Stretch', note: 'After Foam Roll',
            vids: [['1/2 Kneeling Hip Flexor, Wall + Reach','7CU2rovveHM']] },
   cool:  { step: 'Cooldown', title: 'Stretch', note: 'End Of Session',
