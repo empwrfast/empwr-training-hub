@@ -104,7 +104,7 @@ t.onclick = () => { document.body.classList.toggle('dark');
 const pad = n => String(n).padStart(2,'0');
 const titleCase = s => s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s|&)(\w)/g,(m,a,b)=>a+b.toUpperCase()) : s;
 const scheme = r => { const reps = String(r.reps||'').split('|').pop().trim();
-  return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} sets`) : reps; };
+  return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} set${r.sets>1?'s':''}`) : reps; };
 let pages = [], pageIdx = 0, sessionId = null;
 
 function setHeader(s){
