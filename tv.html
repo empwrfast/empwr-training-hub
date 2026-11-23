@@ -117,6 +117,15 @@ aside .box:nth-child(3){display:none}
 .wn{font-size:4.2vh}
 .wr{font-size:3.6vh}
 .coachnote{font-size:2.6vh}
+/* v6: warm-up text auto-fits the screen (as big as it can go) */
+.foam{font-size:calc(4.6vh*var(--k,1))}
+.setlbl{font-size:calc(5vh*var(--k,1))}
+.wuh{font-size:calc(3.8vh*var(--k,1))}
+.wn{font-size:calc(4.2vh*var(--k,1))}
+.wr{font-size:calc(3.6vh*var(--k,1));white-space:normal;text-align:right;max-width:45%}
+.wu{padding:calc(1vh*var(--k,1)) 1.1vw;gap:1vw}
+.wusec{gap:calc(.8vh*var(--k,1))}
+.coachnote{font-size:calc(2.6vh*var(--k,1))}
 </style></head>
 <body>
 <header>
@@ -273,4 +282,14 @@ async function loadStats(){
     .on('postgres_changes',{event:'*',schema:'public',table:'personal_records'},loadStats).subscribe();
   setInterval(()=>{ loadSession(); loadStats(); }, 5*60*1000);
 })();
-</script></body></html>
+</script><script>
+// Shrink the warm-up page just enough to fit, so text stays as big as possible
+function fitWU(){ const L = document.getElementById('lifts'); if (!L) return;
+  const W = L.querySelector('.wucols'); if (!W) { L.style.removeProperty('--k'); return; }
+  const over = () => L.scrollHeight > L.clientHeight + 2 || W.scrollHeight > W.clientHeight + 2;
+  let k = 1; L.style.setProperty('--k', k);
+  while (over() && k > 0.45) { k -= 0.03; L.style.setProperty('--k', k.toFixed(2)); } }
+new MutationObserver(() => requestAnimationFrame(fitWU)).observe(document.getElementById('lifts'), {childList:true});
+addEventListener('resize', fitWU);
+</script>
+</body></html>
