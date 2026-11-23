@@ -68,6 +68,11 @@ main{margin-top:1.5vh}
 .choose{border:.4vh dashed var(--red);border-radius:1.4vh;padding:.8vh .8vw 1vh;display:flex;flex-direction:column;gap:.5vh}
 .chz{font-family:'Bebas Neue';color:var(--red);font-size:3vh;letter-spacing:.08em;line-height:1}
 .or{font-family:'Mr Dafoe';color:var(--red);font-size:3.6vh;text-align:center;line-height:.9}
+/* long pages (warm-up) go two columns */
+#lifts.many{display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:1vh 1vw}
+#lifts.many #band,#lifts.many #navrow{grid-column:1/-1}
+#lifts.many .lift{padding:.9vh 1vw}
+#lifts.many .lift .scheme{font-size:3.2vh}
 </style></head>
 <body>
 <header>
@@ -149,13 +154,14 @@ function groupHtml(list, card){
 // Blank sets/reps = same as the exercise before it in the block
 function fillReps(list){
   list.forEach((r,i)=>{ const reps = String(r.reps||'').split('|').pop().trim();
-    if (!r.sets && !reps && i > 0){ r.sets = list[i-1].sets; r.reps = list[i-1].reps; } });
+    if (r.tempo && !r.sets && !reps && i > 0){ r.sets = list[i-1].sets; r.reps = list[i-1].reps; } });
 }
 function draw(){
   const el = document.getElementById('lifts');
   if (!pages.length){ el.innerHTML = '<div class="empty">No session programmed for today.</div>'; return; }
   if (pageIdx >= pages.length) pageIdx = 0;
   const pg = pages[pageIdx];
+  el.classList.toggle('many', pg.items.length > 6);
   el.innerHTML =
     `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.q}</span></div>`+
     `<span class="tm">${pg.tm ? pg.tm+' min' : ''}</span></div>`+
@@ -185,7 +191,7 @@ async function loadSession(){
     const nm = raw.replace(/\[.*?\]/g,'').trim().split(' ')[0] || 'Today';
     let q = (raw.match(/\[(.*?)\]/)||[])[1] || raw.replace(/\[.*?\]/g,'').trim().split(' ').slice(1).join(' ');
     if (nm.includes('☠')) q = 'Choose 🤗 1';
-    if (!cur || cur.nm !== nm){ cur = { nm, q: titleCase(q), tm: r.rest || '', items: [] }; pages.push(cur); }
+    if (!cur || cur.raw !== raw){ cur = { raw, nm, q: titleCase(q), tm: r.rest || '', items: [] }; pages.push(cur); }
     cur.items.push(r);
   });
   pages.forEach(pg=>fillReps(pg.items));
