@@ -218,7 +218,7 @@ function releaseHtml(list){
   const row = r => `<div class="wu"><span class="wn">${r.exercise.replace(/\bx\d+( each side)?/gi, m=>`<em class="rr">${m}</em>`)}</span><span class="wr">${scheme(r)||''}</span></div>`;
   const sec = (n, title, rows) => rows.length ? `<div class="wusec"><div class="wuh"><b>${n}</b>${title}</div>${rows.map(row).join('')}</div>` : '';
   return '' + // cyclical task coach note left off the TV
-    by('FOAM').map(f=>`<div class="foam">${f.exercise.replace(/\s*-->\s*/g,' → ').replace(/➡️/g,'→')}</div>`).join('') +
+    // foam roll line left off the TV (it has its own screen)
     by('SET').map(s=>`<div class="setlbl">${s.exercise}</div>`).join('') +
     `<div class="wucols">${sec(1,'Turf Drills', by('TURF'))}${sec(2,'Lunges, Hips + Crawl', by('FLOOR').sort(crawlLast).concat(rest))}</div>`;
 }
@@ -234,7 +234,7 @@ function draw(){
   const pg = pages[pageIdx];
   el.classList.toggle('many', pg.items.length > 6 && pg.nm !== 'RELEASE');
   el.innerHTML =
-    `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.q}</span></div>`+
+    `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.nm === 'RELEASE' ? '' : pg.q}</span></div>`+
     `<span class="tm">${pg.tm ? pg.tm+' min' : ''}</span></div>`+
     (pg.nm === 'RELEASE' ? releaseHtml(pg.items) : groupHtml(pg.items, (r,gap)=>`<div class="lift${gap?' gap':''}"><div class="n">${r.tempo||''}</div>
       <div><div class="ex">${r.exercise}</div>${maxRule(r) ? `<div class="note">${maxRule(r)}</div>` : ''}</div>
