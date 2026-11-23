@@ -64,6 +64,7 @@ body{max-width:900px}
 .blknav button{flex:1;font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;padding:14px;border-radius:10px;cursor:pointer;border:2px solid var(--line);background:var(--bg);color:var(--fg)}
 .blknav button.go{background:var(--ink);border-color:var(--ink);color:#fff}
 .set input{font-size:20px;padding:14px}
+.exnote{margin-top:8px;font-size:15px;padding:10px 12px;border-style:dashed}
 .wset{display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;align-items:center;margin:6px 0;opacity:.75}.wset span{font-family:'Bebas Neue';font-size:18px;text-align:center;color:#8a8f98}.wset input{font-size:18px;padding:10px;border-style:dashed}
 .addwu{background:none;border:1px dashed var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;font-family:Montserrat,sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin:4px 0}
 .cardio{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.cardio label{font-size:12px;font-weight:800;display:flex;flex-direction:column;gap:4px}.cardio input,.cardio select{font-size:18px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);width:100%}.cardio .du{display:flex;gap:6px}.cardio .du select{width:auto}
@@ -124,7 +125,7 @@ const tg=$('toggle'); tg.onclick=()=>{document.body.classList.toggle('dark');tg.
 let wuStatus={}; const HAWK='https://www.hawkindynamics.com/hs-fs/hubfs/Brand%20Guidelines%202026/Logos/logo_horz-white.png';
 document.addEventListener('click',e=>{const b=e.target.closest('.ds button'); if(!b) return; const g=b.parentElement, k=g.dataset.k, v=b.dataset.s;
   wuStatus[k] = wuStatus[k]===v ? null : v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.s===wuStatus[k])); });
-let member=null, readiness=null, rule=null, items=[], last={}, prs={}, lastSets={}, wk1Max={};
+let member=null, readiness=null, rule=null, items=[], last={}, prs={}, lastSets={}, wk1Max={}, lastNote={};
 // Week-4 style 'MAX @ wk 1 wt': spell out how the sets run
 const maxRule = it => { const r = String(it.reps||''); if (!/MAX/i.test(r) || !/wk\s*1/i.test(r)) return '';
   const rg = r.match(/MAX\s*(\d+)\s*-\s*(\d+)/i);
@@ -196,6 +197,9 @@ async function loadSession(){
   lastSets = {};
   (hist||[]).forEach(r => { const L = lastSets[r.exercise_id]; if (!L) lastSets[r.exercise_id] = {wl:r.workout_log_id, sets:[r]}; else if (L.wl===r.workout_log_id) L.sets.push(r); });
   Object.entries(lastSets).forEach(([id,L]) => { L.sets.sort((a,b)=>a.set_number-b.set_number); last[id] = Math.max(...L.sets.map(x=>+x.weight)); });
+  // last setup note per exercise (handle, machine, seat...) so they set up the same way next time
+  lastNote = {}; { const { data: wls } = await sb.from('workout_logs').select('notes,created_at').eq('member_id',member.id).order('created_at',{ascending:false}).limit(40);
+    (wls||[]).forEach(w => { let x; try { x = JSON.parse(w.notes||'{}'); } catch(e) { return; } ((x && x.notes)||[]).forEach(n => { if (n.exercise_id && !(n.exercise_id in lastNote)) lastNote[n.exercise_id] = n.note; }); }); }
   // heaviest weight logged in Week 1 of this block (for 'MAX @ wk 1 wt' weeks)
   wk1Max = {}; { const d0 = new Date(); d0.setHours(0,0,0,0); d0.setDate(d0.getDate() - ((d0.getDay()+6)%7) - 7*((items[0].week||1)-1)); const d1 = new Date(d0); d1.setDate(d1.getDate()+7);
     (hist||[]).forEach(r => { const t = new Date(r.created_at); if (t >= d0 && t < d1) wk1Max[r.exercise_id] = Math.max(wk1Max[r.exercise_id]||0, +r.weight); }); }
@@ -277,6 +281,7 @@ async function loadSession(){
       ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${wFor(s)}" data-w>
         <input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? 'max reps' : 'reps'}" value="${rFor(s)}" data-r></div>`).join('')}
+      <input type="text" class="exnote" placeholder="Setup Note: Handle, Machine, Seat... (optional)" maxlength="140" value="${(lastNote[it.exercise_id]||'').replace(/"/g,'&quot;')}" data-note>
     </div>`; };
 
   // Members only log from the lift on: warm-up, reactive and run are coach-led
@@ -306,7 +311,8 @@ $('saveBtn').onclick = async () => {
       if (w||r) extra.warmup_sets.push({exercise_id: it.exercise_id, exercise: it.exercise, set: s+1, weight: w||null, reps: r||null}); });
     const c = card.querySelector('.cardio'); if (c) { const o = {exercise_id: it.exercise_id, exercise: it.exercise};
       c.querySelectorAll('[data-c]').forEach(f=>{ if (f.value) o[f.dataset.c] = f.tagName==='SELECT' ? f.value : (f.dataset.c==='time' ? f.value : parseFloat(f.value)); });
-      if (o.time || o.distance || o.watts || o.max_watts || o.cadence || o.cals || o.speed) extra.cardio.push(o); } });
+      if (o.time || o.distance || o.watts || o.max_watts || o.cadence || o.cals || o.speed) extra.cardio.push(o); }
+    const nt = card.querySelector('[data-note]'); if (nt && nt.value.trim()) (extra.notes ||= []).push({exercise_id: it.exercise_id, exercise: it.exercise, note: nt.value.trim()}); });
   const { data: wl, error } = await sb.from('workout_logs').insert({
     member_id: member.id, session_id: items[0] && items[0].session_id,
     entered_by: enteredBy, readiness_id: readiness && readiness.id, notes: JSON.stringify(extra) }).select().single();
