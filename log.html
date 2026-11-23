@@ -222,12 +222,13 @@ async function loadSession(){
   const letterOf = it => ((it.tempo||'').match(/^[A-Z]/i)||[''])[0].toUpperCase();
   const gapSet = new Set();
   const blockHtml = b => { let html='', prev=null; const L=b.idx;
-    if (/^REACTIVE/i.test(b.nm)) {
-      const note = L.map(ix=>{ const it=items[ix]; const sc=schemeOf(it); return `${it.exercise}${sc?` (${sc})`:''}`; }).join(' · ');
-      const intro = /intro/i.test(b.q);
-      return `<div class="meta" style="font-style:italic;margin:10px 0">Coach note: ${note}</div>` +
-        (intro ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--ink);color:#fff;font-family:'Bebas Neue';font-size:22px;letter-spacing:.05em"><span>Follow Your Coach</span>${dsBtns('reactintro')}</div>`
-        : `<div class="card hawk"><img src="${HAWK}" alt="Hawkin Dynamics"><div class="hk">Go Jump On The Hawkin Force Plate</div><div class="meta" style="color:#cfd3da">Do your jumps with your coach, then come back and tap Done.</div>${dsBtns('hawkin')}</div>`);
+    if (/^REACTIVE/i.test(b.nm) && /intro/i.test(b.q)) {
+      // Reactive Intro: drills are a coach note, members go jump on the Hawkin plate
+      const fp = L.map(ix=>items[ix]).find(it=>/force\s*plate/i.test(it.exercise));
+      const note = L.map(ix=>items[ix]).filter(it=>it!==fp).map(it=>it.exercise.replace(/^•\s*/,'')).join(' · ');
+      const cue = fp ? tc(fp.exercise.replace(/\s+-\s+/g,', ')).replace(/!+$/,'') : 'Test Your Jump On The Force Plate';
+      return (note ? `<div class="meta" style="font-style:italic;margin:10px 0">Coach note: ${note}</div>` : '') +
+        `<div class="card hawk"><img src="${HAWK}" alt="Hawkin Dynamics"><div class="hk">Go Jump On The Hawkin Force Plate</div><div class="meta" style="color:#cfd3da">${cue}</div>${dsBtns('hawkin')}</div>`;
     }
     for (let k=0;k<L.length;k++){ const it=items[L[k]], lbl=it.tempo||'', le=letterOf(it);
       const gap = prev!==null && le && le!==prev; prev = le||prev;
