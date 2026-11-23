@@ -65,6 +65,7 @@ button{font:inherit;cursor:pointer}
     <input id="search" placeholder="Type a member's name" autocomplete="off">
     <div id="results"></div>
     <div id="chips"></div>
+    <div id="hereNote" style="font-size:13px;color:var(--mute);margin-top:8px"></div>
   </div>
   <button class="main" id="startBtn" disabled>Start Logging</button>
 </section>
@@ -72,6 +73,7 @@ button{font:inherit;cursor:pointer}
 <!-- STEP 2: board -->
 <section id="stepBoard" class="hidden">
   <h1 id="title">Today's Lift</h1><h2 id="sub"></h2>
+  <div class="card" style="padding:10px 14px"><input id="late" placeholder="+ Add A Name (late arrival)" autocomplete="off"><div id="lateRes"></div></div>
   <div id="board"></div>
   <div id="bar"><div class="in"><button class="main" id="saveAll" style="margin:0">Save All</button></div></div>
 </section>
@@ -106,8 +108,39 @@ $('chips').onclick = e => { const b = e.target.closest('.chip'); if (!b) return;
 function drawChips(){ $('chips').innerHTML = picked.map(p => `<button class="chip" data-id="${p.id}">${p.name}</button>`).join('');
   $('startBtn').disabled = !picked.length; $('startBtn').textContent = picked.length ? `Start Logging (${picked.length})` : 'Start Logging'; }
 $('startBtn').onclick = load;
+// who's here: everyone who checked in on the iPad today shows up on their own (tap ✕ to drop a no-show)
+(async () => { const d = new Date(), days = [d.toLocaleDateString('en-CA'), d.toISOString().slice(0, 10)];
+  const { data: ck } = await sb.from('readiness_checkins').select('member_id').in('checkin_date', days);
+  const ids = [...new Set((ck || []).map(c => c.member_id))]; if (!ids.length) return;
+  const { data: ms } = await sb.from('members').select('id,first_name,last_name').in('id', ids);
+  (ms || []).sort((a, b) => a.first_name.localeCompare(b.first_name)).forEach(m => { if (!picked.some(p => p.id === m.id)) picked.push({ id: m.id, name: `${m.first_name} ${m.last_name}` }); });
+  $('hereNote').textContent = `${(ms || []).length} checked in on the iPad today. Add anyone else below, or tap ✕ to drop a no-show.`; drawChips(); })();
 
 // ===== STEP 2 =====
+let blocks = [];
+const setBox = (s, w, r) => `<div class="st"><span>${s}</span><input type="number" inputmode="decimal" placeholder="${w || 'lb'}" data-w><i>×</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r></div>`;
+function rowHtml(p, it){ const n = Math.max(1, it.sets || 3), L = (last[p.id] || {})[it.exercise_id];
+  const w = s => { if (!L) return ''; const x = L[s] || L[L.length - 1]; return x && x.weight ? +x.weight : ''; };
+  return `<div class="mrow" data-m="${p.id}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.<small>${L ? 'Last: ' + L.map(x => `${+x.weight}×${x.reps}`).join(', ') : 'No history yet'}</small></div>
+    <div><div class="sets">${Array.from({ length: n }, (_, s) => setBox(s + 1, w(s), parseInt(repsOf(it)) || '')).join('')}<button class="plus" title="Add a set">+</button>${L ? '<button class="same">Same As Last</button>' : ''}</div><div class="mtot"></div></div></div>`; }
+async function loadHist(memberIds){ const ids = items.map(i => i.exercise_id).filter(Boolean); if (!ids.length || !memberIds.length) return;
+  const { data: hist } = await sb.from('set_logs').select('member_id,exercise_id,set_number,weight,reps,workout_log_id,created_at')
+    .in('member_id', memberIds).in('exercise_id', ids).order('created_at', { ascending: false }).limit(3000);
+  const wlOf = {};
+  (hist || []).forEach(r => { const k = r.member_id + '|' + r.exercise_id;
+    if (!(k in wlOf)) wlOf[k] = r.workout_log_id;
+    if (wlOf[k] === r.workout_log_id) ((last[r.member_id] ||= {})[r.exercise_id] ||= []).push(r); });
+  memberIds.forEach(id => Object.values(last[id] || {}).forEach(a => a.sort((x, y) => x.set_number - y.set_number))); }
+// late arrival: search, then add their row under every exercise
+let lt; $('late').oninput = e => { clearTimeout(lt); lt = setTimeout(async () => {
+  const q = e.target.value.trim(); if (q.length < 2) { $('lateRes').innerHTML = ''; return; }
+  const { data } = await sb.from('members').select('id,first_name,last_name').eq('active', true).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(6);
+  $('lateRes').innerHTML = (data || []).filter(m => !picked.some(p => p.id === m.id))
+    .map(m => `<button data-id="${m.id}" data-n="${esc(m.first_name)} ${esc(m.last_name)}" style="display:block;width:100%;text-align:left;padding:10px;margin-top:6px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:600">${esc(m.first_name)} ${esc(m.last_name)}</button>`).join(''); }, 250); };
+$('lateRes').onclick = async e => { const b = e.target.closest('button'); if (!b) return; const p = { id: b.dataset.id, name: b.dataset.n };
+  picked.push(p); $('late').value = ''; $('lateRes').innerHTML = ''; await loadHist([p.id]);
+  document.querySelectorAll('.ex').forEach(card => card.insertAdjacentHTML('beforeend', rowHtml(p, items[+card.dataset.idx])));
+  $('sub').textContent = `Week ${items[0].week} · ${picked.map(x => x.name.split(' ')[0]).join(', ')}`; totals(); };
 const repsOf = it => String(it.reps || '').split('|').pop().trim();
 const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets > 1 ? 's' : ''}`) : repsOf(it);
 const isLift = it => it.sets && !/^(RELEASE|REACTIVE|RUN|RESILIENCY)/i.test((it.intensity || '').trim()) && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo || '');
@@ -124,35 +157,24 @@ async function load(){
   const idBy = Object.fromEntries((ex || []).map(e => [e.name, e.id]));
   items.forEach(i => i.exercise_id = idBy[i.exercise]);
   const ids = items.map(i => i.exercise_id).filter(Boolean);
-  // each member's last session for each exercise, set by set
-  const { data: hist } = await sb.from('set_logs').select('member_id,exercise_id,set_number,weight,reps,workout_log_id,created_at')
-    .in('member_id', picked.map(p => p.id)).in('exercise_id', ids).order('created_at', { ascending: false }).limit(3000);
-  last = {}; const wlOf = {};
-  (hist || []).forEach(r => { const k = r.member_id + '|' + r.exercise_id;
-    if (!(k in wlOf)) wlOf[k] = r.workout_log_id;
-    if (wlOf[k] === r.workout_log_id) ((last[r.member_id] ||= {})[r.exercise_id] ||= []).push(r); });
-  Object.values(last).forEach(m => Object.values(m).forEach(a => a.sort((x, y) => x.set_number - y.set_number)));
+  last = {}; await loadHist(picked.map(p => p.id));
 
   const t0 = (items[0].title || '').trim();
   $('title').textContent = tc(t0.split('--').pop().replace(/\[.*?\]/g, '').trim()) || "Today's Lift";
   $('sub').textContent = `Week ${items[0].week} · ${picked.map(p => p.name.split(' ')[0]).join(', ')}`;
 
   // blocks, same grouping as the TV
-  const blocks = []; let cur = null;
+  blocks = []; let cur = null;
   items.forEach((it, idx) => { if (!isLift(it)) return;
     const raw = (it.intensity || '').replace(/\s+/g, ' ').trim();
     if (!cur || cur.raw !== raw) { const nm = raw.replace(/\[.*?\]/g, '').trim().split(' ')[0];
       cur = { raw, nm, q: tc((raw.match(/\[(.*?)\]/) || [])[1] || ''), idx: [] }; blocks.push(cur); }
     cur.idx.push(idx); });
 
-  const setBox = (s, w, r) => `<div class="st"><span>${s}</span><input type="number" inputmode="decimal" placeholder="${w || 'lb'}" data-w><i>×</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r></div>`;
-  const card = idx => { const it = items[idx], n = Math.max(1, it.sets || 3), mult = /\de\b/i.test(repsOf(it)) ? 2 : 1;
+  const card = idx => { const it = items[idx], mult = /\de\b/i.test(repsOf(it)) ? 2 : 1;
     return `<div class="card ex" data-idx="${idx}" data-mult="${mult}">
       <div class="exhead"><h3><span class="lbl">${esc(it.tempo || '')}</span>${esc(it.exercise)}</h3><b>${esc(schemeOf(it))}</b></div>
-      ${picked.map(p => { const L = (last[p.id] || {})[it.exercise_id];
-        const w = s => { if (!L) return ''; const x = L[s] || L[L.length - 1]; return x && x.weight ? +x.weight : ''; };
-        return `<div class="mrow" data-m="${p.id}"><div class="who">${p.name.split(' ')[0]} ${p.name.split(' ').slice(1).join(' ').slice(0,1)}.<small>${L ? 'Last: ' + L.map(x => `${+x.weight}×${x.reps}`).join(', ') : 'No history yet'}</small></div>
-          <div><div class="sets">${Array.from({ length: n }, (_, s) => setBox(s + 1, w(s), parseInt(repsOf(it)) || '')).join('')}<button class="plus" title="Add a set">+</button>${L ? '<button class="same">Same As Last</button>' : ''}</div><div class="mtot"></div></div></div>`; }).join('')}
+      ${picked.map(p => rowHtml(p, it)).join('')}
     </div>`; };
   const blockHtml = b => { let h = ''; const L = b.idx;
     for (let k = 0; k < L.length; k++) { const lbl = items[L[k]].tempo;
