@@ -68,6 +68,7 @@ body{max-width:900px}
 #wtotal{font-family:'Bebas Neue';font-size:26px;letter-spacing:.04em;text-align:center;margin:14px 0 8px}
 .sumbox{background:var(--card);border-radius:10px;padding:12px 14px;margin:10px 0}.sumh{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;margin-bottom:6px}.sumr{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}.sumr.tot{border:0;font-family:'Bebas Neue';font-size:24px;padding-top:8px}
 .sethdr{display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#8a8f98;margin:10px 0 -2px}.sethdr b{color:var(--fg);font-size:14px}
+.fill{margin-left:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:3px 8px;font:700 11px Montserrat,sans-serif;text-transform:none;letter-spacing:0;cursor:pointer}
 .rstep{display:flex;gap:6px;align-items:stretch}.rstep input{text-align:center;min-width:0}.rstep button{flex:0 0 52px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font-size:24px;font-weight:700;cursor:pointer}
 .addset{background:none;border:1px dashed var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;font-family:Montserrat,sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin:4px 0 0}
 .exnote{margin-top:8px;font-size:15px;padding:10px 12px;border-style:dashed}
@@ -154,6 +155,9 @@ function updVol(){ let total = 0; const rows = [];
   const t = $('wtotal'); if (t) t.innerHTML = total ? `Workout Total: <b>${fmt(total)} lb</b>` : '';
   return {total, rows}; }
 document.addEventListener('input', e => { if (e.target.matches('.set input')) updVol(); });
+// Autofill: copy set 1's number down the whole column
+document.addEventListener('click', e => { const b = e.target.closest('.fill'); if (!b) return; const card = b.closest('.ex'), k = b.dataset.c;
+  const ins = [...card.querySelectorAll('.set [data-' + k + ']')]; if (!ins.length || !ins[0].value) return; ins.forEach(i => i.value = ins[0].value); updVol(); });
 // rep steppers: tap − / + to do less or more than the target
 document.addEventListener('click', e => { const b = e.target.closest('.rm,.rp'); if (!b) return; const i = b.parentElement.querySelector('[data-r]');
   i.value = Math.max(0, (parseInt(i.value) || 0) + (b.classList.contains('rp') ? 1 : -1)); updVol(); });
@@ -301,7 +305,7 @@ async function loadSession(){
     return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}" data-mult="${/\de\b/i.test(repsOf(it)) ? 2 : 1}">${head}
       <div class="sugg">${mr ? `<div style="font-weight:700;margin-bottom:4px">${mr}${w1 ? ` Your Week 1 top weight: ${w1} lb.` : ''}</div>` : ''}${!lift ? '' : L ? `Last time: ${L.sets.map(x=>`${+x.weight} × ${x.reps}`).join(' · ')}${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
-      ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button><div class="sethdr"><span></span><span>Weight (lb)</span><span>Reps${repsOf(it) ? ` · Target <b>${repsOf(it)}</b>` : ''}</span></div>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
+      ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button><div class="sethdr"><span></span><span>Weight (lb) <button class="fill" data-c="w">Autofill ↓</button></span><span>Reps${repsOf(it) ? ` · Target <b>${repsOf(it)}</b>` : ''} <button class="fill" data-c="r">Autofill ↓</button></span></div>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${wFor(s)}" data-w>
         <div class="rstep"><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? 'max' : 'reps'}" value="${rFor(s)}" data-r><button class="rp" aria-label="One more rep">+</button></div></div>`).join('')}
       ${!lift ? '' : '<div class="vol" data-vol></div><button class="addset">+ Add A Set</button>'}
