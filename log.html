@@ -124,7 +124,12 @@ const tg=$('toggle'); tg.onclick=()=>{document.body.classList.toggle('dark');tg.
 let wuStatus={}; const HAWK='https://www.hawkindynamics.com/hs-fs/hubfs/Brand%20Guidelines%202026/Logos/logo_horz-white.png';
 document.addEventListener('click',e=>{const b=e.target.closest('.ds button'); if(!b) return; const g=b.parentElement, k=g.dataset.k, v=b.dataset.s;
   wuStatus[k] = wuStatus[k]===v ? null : v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.s===wuStatus[k])); });
-let member=null, readiness=null, rule=null, items=[], last={}, prs={}, lastSets={};
+let member=null, readiness=null, rule=null, items=[], last={}, prs={}, lastSets={}, wk1Max={};
+// Week-4 style 'MAX @ wk 1 wt': spell out how the sets run
+const maxRule = it => { const r = String(it.reps||''); if (!/MAX/i.test(r) || !/wk\s*1/i.test(r)) return '';
+  const rg = r.match(/MAX\s*(\d+)\s*-\s*(\d+)/i);
+  const uni = /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|OVR\s*UNDER|MIXED|EACH SIDE/i.test(it.exercise) || /\d+e\b/i.test(r);
+  return `Use Your Top Week 1 Weight. Sets 1 + 2: Same Reps As Last Week. Set 3: Max Reps${rg ? ` (Min ${rg[1]}, Max ${rg[2]})` : ''}${uni ? '. One Side, Go Do The Rest, Then Come Back For The Other Side' : ''}.`; };
 const isCardio = it => /^RESILIENCY/i.test((it.intensity||'').trim());
 // default distance unit per machine at EMPWR
 const unitFor = n => /versa/i.test(n) ? 'ft' : /true\s*form/i.test(n) ? 'km' : /woodway|4\s*front/i.test(n) ? 'mi' : /echo|bike/i.test(n) ? 'mi' : /ski|row/i.test(n) ? 'm' : /treadmill/i.test(n) ? 'km' : 'm';
@@ -191,6 +196,9 @@ async function loadSession(){
   lastSets = {};
   (hist||[]).forEach(r => { const L = lastSets[r.exercise_id]; if (!L) lastSets[r.exercise_id] = {wl:r.workout_log_id, sets:[r]}; else if (L.wl===r.workout_log_id) L.sets.push(r); });
   Object.entries(lastSets).forEach(([id,L]) => { L.sets.sort((a,b)=>a.set_number-b.set_number); last[id] = Math.max(...L.sets.map(x=>+x.weight)); });
+  // heaviest weight logged in Week 1 of this block (for 'MAX @ wk 1 wt' weeks)
+  wk1Max = {}; { const d0 = new Date(); d0.setHours(0,0,0,0); d0.setDate(d0.getDate() - ((d0.getDay()+6)%7) - 7*((items[0].week||1)-1)); const d1 = new Date(d0); d1.setDate(d1.getDate()+7);
+    (hist||[]).forEach(r => { const t = new Date(r.created_at); if (t >= d0 && t < d1) wk1Max[r.exercise_id] = Math.max(wk1Max[r.exercise_id]||0, +r.weight); }); }
   const { data: pr } = await sb.from('personal_records').select('*').eq('member_id',member.id).in('exercise_id',ids);
   (pr||[]).forEach(r => { (prs[r.exercise_id] ||= {})[r.pr_type] = r.value; });
 
@@ -260,13 +268,15 @@ async function loadSession(){
     const pct = rule.load_pct/100;
     const p = prs[it.exercise_id] || {};
     const nSets = Math.max(1, it.sets || 3);
-    const wFor = s => { if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? round5(x.weight*pct) : ''; };
+    const mr = maxRule(it), w1 = wk1Max[it.exercise_id];
+    const wFor = s => { if (mr && w1) return w1; if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? round5(x.weight*pct) : ''; };
+    const rFor = s => { if (mr) { if (s === nSets-1) return ''; const x = L && (L.sets[s] || L.sets[L.sets.length-1]); return x ? x.reps : ''; } return parseInt(repsOf(it))||''; };
     return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">${head}
-      <div class="sugg">${!lift ? '' : L ? `Last time: ${L.sets.map(x=>`${+x.weight} × ${x.reps}`).join(' · ')}${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : 'First time logging this one. Pick a weight you can own.'}
+      <div class="sugg">${mr ? `<div style="font-weight:700;margin-bottom:4px">${mr}${w1 ? ` Your Week 1 top weight: ${w1} lb.` : ''}</div>` : ''}${!lift ? '' : L ? `Last time: ${L.sets.map(x=>`${+x.weight} × ${x.reps}`).join(' · ')}${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
       ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${wFor(s)}" data-w>
-        <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(repsOf(it))||''}" data-r></div>`).join('')}
+        <input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? 'max reps' : 'reps'}" value="${rFor(s)}" data-r></div>`).join('')}
     </div>`; };
 
   // Members only log from the lift on: warm-up, reactive and run are coach-led
