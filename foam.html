@@ -129,9 +129,21 @@ setInterval(() => players.forEach(p => { try {
   if (d && t > (p.__end || d - 0.8)) p.seekTo(0, true);
   if (p.getPlaybackRate && p.getPlaybackRate() !== RATE) p.setPlaybackRate(RATE);
 } catch(e){} }), 300);
+// Manual switch: click Foam Roll / Stretch (or arrow keys); Auto goes back to the schedule
+let manual = null;
+function setMode(k){ manual = k === 'auto' ? null : k; document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x.dataset.k === k)); tick(); }
+(function(){ const st = document.createElement('style');
+  st.textContent = '#modes{position:fixed;left:16px;bottom:16px;display:flex;gap:8px;z-index:50;opacity:.4;transition:opacity .2s}#modes:hover{opacity:1}#modes button{font-family:"Bebas Neue",sans-serif;font-size:22px;letter-spacing:.05em;padding:8px 18px;border-radius:10px;border:2px solid #fff;background:rgba(18,22,31,.75);color:#fff;cursor:pointer}#modes button.on{background:#EB5345;border-color:#EB5345}';
+  document.head.appendChild(st);
+  const md = document.createElement('div'); md.id = 'modes';
+  md.innerHTML = '<button data-k="foam">Foam Roll</button><button data-k="cool">Stretch</button><button data-k="auto" class="on">Auto</button>';
+  document.body.appendChild(md);
+  md.addEventListener('click', e => { const x = e.target.closest('button'); if (x) setMode(x.dataset.k); });
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') setMode('foam'); else if (e.key === 'ArrowRight') setMode('cool'); else if (e.key === 'a' || e.key === 'A') setMode('auto'); });
+})();
 function tick(){
-  const s = now();
-  if (s.key !== shown) draw(s.key);
+  const s = now(), key = manual || s.key;
+  if (key !== shown) draw(key);
   const box = document.getElementById('cdbox');
   if (s.t !== null && (s.key === 'foam' || s.key === 'hip')){
     const diff = (s.t - s.m) * 60, x = Math.abs(diff);
