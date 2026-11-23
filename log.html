@@ -5,8 +5,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6;--line:#D9DCE1}
-body.dark{--bg:var(--onyx);--fg:var(--wht);--card:#1C2230;--line:#2C3446}
+:root{--ink:#12161F;--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6;--line:#D9DCE1}
+body.dark{--ink:#2C3446;--bg:var(--onyx);--fg:var(--wht);--card:#1C2230;--line:#2C3446}
 *{box-sizing:border-box;margin:0}
 body{background:var(--bg);color:var(--fg);font-family:Montserrat,sans-serif;max-width:640px;margin:auto;padding:16px 16px 90px}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
@@ -14,18 +14,25 @@ header img{height:44px}
 body.dark .logo-onyx,body:not(.dark) .logo-white{display:none}
 #toggle{background:none;border:2px solid var(--fg);color:var(--fg);border-radius:50%;width:38px;height:38px;cursor:pointer}
 h1{font-family:'Bebas Neue';font-size:40px;letter-spacing:.04em;line-height:1}
-h2{font-family:'Mr Dafoe';color:var(--red);font-size:30px;margin:-6px 0 10px}
+h2{font-family:'Mr Dafoe';font-weight:400;color:var(--fg);font-size:34px;letter-spacing:.02em;margin:-6px 0 10px}
 h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em}
 .card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}
 input,select{font:inherit;width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 button.main{font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;width:100%;padding:12px;border:0;border-radius:10px;background:var(--red);color:#fff;cursor:pointer;margin-top:10px}
 .hidden{display:none}
 .scale{display:flex;gap:6px;margin:6px 0 12px}
+.ds{display:flex;gap:6px;font-family:inherit}.ds button{font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;padding:6px 14px;border-radius:8px;border:2px solid #fff;background:transparent;color:#fff;cursor:pointer}
+.ds button[data-s=done].on{background:#2FA84F;border-color:#2FA84F}.ds button[data-s=skip].on{background:#8a8f98;border-color:#8a8f98}
+.lbls{display:flex;gap:6px;margin:4px 0 -2px}.lbls span{flex:1;text-align:center;font-size:12px;font-weight:800;line-height:1.1}
 .scale button{flex:1;padding:10px 0;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-weight:800;cursor:pointer}
 .scale button.on{background:var(--red);color:#fff;border-color:var(--red)}
+.scale button[data-v="1"]{--c:#E5484D}.scale button[data-v="2"]{--c:#F07A3C}.scale button[data-v="3"]{--c:#E8B32E}.scale button[data-v="4"]{--c:#8DBF3F}.scale button[data-v="5"]{--c:#2FA84F}
+.scale button{background:color-mix(in srgb,var(--c) 12%,var(--bg));border-color:color-mix(in srgb,var(--c) 45%,var(--bg))}
+.scale button.on{background:var(--c);border-color:var(--c);color:#fff}
 .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-family:'Bebas Neue';font-size:22px;color:#fff}
 .Green{background:#2E9E5B}.Yellow{background:#E0B21F}.Orange{background:#E07A1F}.Red{background:var(--red)}
-.ex{border-left:6px solid var(--red)}
+.ex{border-left:6px solid var(--line)}
+.hawk{background:var(--ink);color:#fff;text-align:center;padding:18px}.hawk img{height:44px;margin:4px auto 10px;display:block}.hawk .hk{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em;line-height:1.05;margin-bottom:6px}.hawk .ds{justify-content:center;margin-top:12px}
 .exhead{display:flex;justify-content:space-between;align-items:baseline}
 .meta{font-size:13px;opacity:.75;margin:4px 0 8px}
 .sugg{font-size:14px;margin-bottom:8px}
@@ -41,28 +48,31 @@ a{color:var(--red)}
 body{max-width:900px}
 #phaseLine{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
 #phaseLine .ph{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em}
-#phaseLine .cur{font-family:'Mr Dafoe';color:var(--red);font-size:34px;line-height:1}
+#phaseLine .cur{font-family:'Mr Dafoe';font-weight:400;color:var(--red);font-size:38px;letter-spacing:.02em;line-height:1}
 #sessSub{font-family:'Bebas Neue';color:var(--fg);opacity:.6;font-size:20px;letter-spacing:.05em;margin:0 0 6px}
 #tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:8px 0}
-#tabs button{flex:1 0 auto;font-family:'Bebas Neue';font-size:20px;letter-spacing:.05em;padding:10px 14px;border-radius:10px;border:2px solid var(--red);background:var(--bg);color:var(--red);cursor:pointer}
-#tabs button.on{background:var(--red);color:#fff}
+#tabs button{flex:1 0 auto;font-family:'Bebas Neue';font-size:20px;letter-spacing:.05em;padding:10px 14px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+#tabs button.on{background:var(--red);border-color:var(--red);color:#fff}
 #tabs button.done::after{content:' ✓'}
-.band{display:flex;justify-content:space-between;align-items:center;background:var(--red);color:#fff;border-radius:10px;padding:8px 14px;margin-top:6px}
+.band{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:10px;padding:8px 14px;margin-top:6px}
 .band .l{display:flex;align-items:baseline;gap:12px}
 .band .nm{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em;line-height:1}
-.band .q{font-family:'Mr Dafoe';font-size:26px;line-height:1}
+.band .q{font-family:'Mr Dafoe';font-weight:400;font-size:30px;letter-spacing:.02em;line-height:1}
 .band .tm{font-family:'Bebas Neue';font-size:18px;letter-spacing:.06em}
-.exhead h3 .lbl{color:var(--red);margin-right:8px}
+.exhead h3 .lbl{color:#8a8f98;margin-right:8px}
 .blknav{display:flex;gap:10px;margin-top:8px}
-.blknav button{flex:1;font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;padding:14px;border-radius:10px;cursor:pointer;border:2px solid var(--red);background:var(--bg);color:var(--red)}
-.blknav button.go{background:var(--red);color:#fff}
+.blknav button{flex:1;font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;padding:14px;border-radius:10px;cursor:pointer;border:2px solid var(--line);background:var(--bg);color:var(--fg)}
+.blknav button.go{background:var(--ink);border-color:var(--ink);color:#fff}
 .set input{font-size:20px;padding:14px}
+.wset{display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;align-items:center;margin:6px 0;opacity:.75}.wset span{font-family:'Bebas Neue';font-size:18px;text-align:center;color:#8a8f98}.wset input{font-size:18px;padding:10px;border-style:dashed}
+.addwu{background:none;border:1px dashed var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;font-family:Montserrat,sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin:4px 0}
+.cardio{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.cardio label{font-size:12px;font-weight:800;display:flex;flex-direction:column;gap:4px}.cardio input,.cardio select{font-size:18px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);width:100%}.cardio .du{display:flex;gap:6px}.cardio .du select{width:auto}
 /* v3: letter groups + choose one */
 .ex.gap,.choose.gap{margin-top:34px}
-.choose{border:3px dashed var(--red);border-radius:14px;padding:6px 10px 10px;margin:12px 0}
+.choose{border:3px dashed #8a8f98;border-radius:14px;padding:6px 10px 10px;margin:12px 0}
 .choose .ex{margin:8px 0}
-.chz{font-family:'Bebas Neue';color:var(--red);font-size:22px;letter-spacing:.08em}
-.or{font-family:'Mr Dafoe';color:var(--red);font-size:30px;text-align:center;line-height:1}
+.chz{font-family:'Bebas Neue';color:var(--fg);font-size:22px;letter-spacing:.08em}
+.or{font-family:'Mr Dafoe';font-weight:400;color:var(--fg);font-size:32px;text-align:center;line-height:1}
 </style></head>
 <body>
 <header>
@@ -111,7 +121,19 @@ const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const enteredBy = params.get('mode') || (params.get('log') !== null ? 'member' : 'tablet'); // ?mode=coach on laptops
 const tg=$('toggle'); tg.onclick=()=>{document.body.classList.toggle('dark');tg.textContent=document.body.classList.contains('dark')?'🌙':'☀️';};
-let member=null, readiness=null, rule=null, items=[], last={}, prs={};
+let wuStatus={}; const HAWK='https://www.hawkindynamics.com/hs-fs/hubfs/Brand%20Guidelines%202026/Logos/logo_horz-white.png';
+document.addEventListener('click',e=>{const b=e.target.closest('.ds button'); if(!b) return; const g=b.parentElement, k=g.dataset.k, v=b.dataset.s;
+  wuStatus[k] = wuStatus[k]===v ? null : v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.s===wuStatus[k])); });
+let member=null, readiness=null, rule=null, items=[], last={}, prs={}, lastSets={};
+const isCardio = it => /^RESILIENCY/i.test((it.intensity||'').trim());
+// default distance unit per machine at EMPWR
+const unitFor = n => /versa/i.test(n) ? 'ft' : /true\s*form/i.test(n) ? 'km' : /woodway|4\s*front/i.test(n) ? 'mi' : /echo|bike/i.test(n) ? 'mi' : /ski|row/i.test(n) ? 'm' : /treadmill/i.test(n) ? 'km' : 'm';
+const cardioHtml = it => { const n = it.exercise, u = unitFor(n);
+  const tm = /treadmill|woodway|4\s*front|true\s*form/i.test(n), incl = /treadmill|woodway|4\s*front/i.test(n);
+  const spd = u==='mi' ? 'mph' : 'km/h';
+  return `<div class="cardio"><label>Time<input type="text" inputmode="numeric" placeholder="min:sec" data-c="time"></label><label>Distance<span class="du"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('')}</select></span></label>${tm ? `<label>Speed (${spd})<input type="number" inputmode="decimal" placeholder="${spd}" data-c="speed"></label>${incl ? `<label>Incline %<input type="number" inputmode="decimal" placeholder="%" data-c="incline"></label>` : `<label>Calories<input type="number" inputmode="numeric" placeholder="cal" data-c="cals"></label>`}` : /echo|bike/i.test(n) ? `<label>Avg Watts<input type="number" inputmode="numeric" placeholder="W" data-c="watts"></label><label>Max Watts<input type="number" inputmode="numeric" placeholder="W" data-c="max_watts"></label><label>Cadence (rpm)<input type="number" inputmode="numeric" placeholder="rpm" data-c="cadence"></label><label>Calories<input type="number" inputmode="numeric" placeholder="cal" data-c="cals"></label>` : `<label>Avg Watts<input type="number" inputmode="numeric" placeholder="W" data-c="watts"></label><label>Calories<input type="number" inputmode="numeric" placeholder="cal" data-c="cals"></label>`}</div>`; };
+document.addEventListener('click',e=>{ const b=e.target.closest('.addwu'); if(!b) return; const box=b.previousElementSibling, n=box.children.length+1;
+  box.insertAdjacentHTML('beforeend',`<div class="wset"><span>W${n}</span><input type="number" inputmode="decimal" placeholder="lb" data-w><input type="number" inputmode="numeric" placeholder="reps" data-r></div>`); });
 const show = id => ['stepWho','stepReady','stepSession'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
 const round5 = w => Math.round(w/5)*5;
 
@@ -125,11 +147,13 @@ let t; $('search').oninput = e => { clearTimeout(t); t = setTimeout(async()=>{
 },250); };
 
 // STEP 2
-const Q = [['sleep','Sleep'],['energy','Energy'],['soreness','Soreness (5 = not sore)'],['stress','Stress (5 = calm)']];
+const Q = [['sleep','Sleep'],['energy','Energy'],['soreness','Soreness'],['stress','Stress']];
+const QL = {sleep:['Terrible','Poor','Okay','Good','Great'],energy:['Drained','Low','Okay','Good','Fired Up'],soreness:['Very Sore','Sore','Some','A Little','Not Sore'],stress:['Maxed Out','Stressed','Okay','Relaxed','Calm']};
+const QC = ['#E5484D','#F07A3C','#C9951A','#6FA22E','#2FA84F'];
 const vals = {};
 function startReady(){
   $('hello').textContent = `Hey ${member.first}`;
-  $('scales').innerHTML = Q.map(([k,l])=>`<div><b>${l}</b><div class="scale" data-k="${k}">${[1,2,3,4,5].map(n=>`<button data-v="${n}">${n}</button>`).join('')}</div></div>`).join('');
+  $('scales').innerHTML = Q.map(([k,l])=>`<div><b>${l}</b><div class="lbls">${QL[k].map((w,i)=>`<span style="color:${QC[i]}">${w}</span>`).join('')}</div><div class="scale" data-k="${k}">${[1,2,3,4,5].map(n=>`<button data-v="${n}">${n}</button>`).join('')}</div></div>`).join('');
   $('scales').querySelectorAll('.scale').forEach(row=>row.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     row.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); vals[row.dataset.k]=+b.dataset.v; }));
   show('stepReady');
@@ -162,8 +186,11 @@ async function loadSession(){
   const idByName = Object.fromEntries((exIds||[]).map(e=>[e.name,e.id]));
   items.forEach(i => i.exercise_id = idByName[i.exercise]);
   const ids = items.map(i=>i.exercise_id).filter(Boolean);
-  const { data: sl } = await sb.from('suggested_loads').select('*').eq('member_id',member.id).in('exercise_id',ids);
-  (sl||[]).forEach(r => last[r.exercise_id] = r.last_weight);
+  // last time this member did each exercise: set by set
+  const { data: hist } = await sb.from('set_logs').select('exercise_id,set_number,weight,reps,workout_log_id,created_at').eq('member_id',member.id).in('exercise_id',ids).order('created_at',{ascending:false}).limit(500);
+  lastSets = {};
+  (hist||[]).forEach(r => { const L = lastSets[r.exercise_id]; if (!L) lastSets[r.exercise_id] = {wl:r.workout_log_id, sets:[r]}; else if (L.wl===r.workout_log_id) L.sets.push(r); });
+  Object.entries(lastSets).forEach(([id,L]) => { L.sets.sort((a,b)=>a.set_number-b.set_number); last[id] = Math.max(...L.sets.map(x=>+x.weight)); });
   const { data: pr } = await sb.from('personal_records').select('*').eq('member_id',member.id).in('exercise_id',ids);
   (pr||[]).forEach(r => { (prs[r.exercise_id] ||= {})[r.pr_type] = r.value; });
 
@@ -195,6 +222,13 @@ async function loadSession(){
   const letterOf = it => ((it.tempo||'').match(/^[A-Z]/i)||[''])[0].toUpperCase();
   const gapSet = new Set();
   const blockHtml = b => { let html='', prev=null; const L=b.idx;
+    if (/^REACTIVE/i.test(b.nm)) {
+      const note = L.map(ix=>{ const it=items[ix]; const sc=schemeOf(it); return `${it.exercise}${sc?` (${sc})`:''}`; }).join(' · ');
+      const intro = /intro/i.test(b.q);
+      return `<div class="meta" style="font-style:italic;margin:10px 0">Coach note: ${note}</div>` +
+        (intro ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--ink);color:#fff;font-family:'Bebas Neue';font-size:22px;letter-spacing:.05em"><span>Follow Your Coach</span>${dsBtns('reactintro')}</div>`
+        : `<div class="card hawk"><img src="${HAWK}" alt="Hawkin Dynamics"><div class="hk">Go Jump On The Hawkin Force Plate</div><div class="meta" style="color:#cfd3da">Do your jumps with your coach, then come back and tap Done.</div>${dsBtns('hawkin')}</div>`);
+    }
     for (let k=0;k<L.length;k++){ const it=items[L[k]], lbl=it.tempo||'', le=letterOf(it);
       const gap = prev!==null && le && le!==prev; prev = le||prev;
       if (lbl && !WU.has(lbl) && L[k+1]!==undefined && items[L[k+1]].tempo===lbl){
@@ -206,27 +240,31 @@ async function loadSession(){
   const wuRank = ix => { const it = items[ix], t = it.tempo||''; return ({COACH:0,FOAM:1,SET:2,TURF:3,FLOOR:5}[t] ?? 4) + (t==='FLOOR' && /KOMODO|CRAWL/i.test(it.exercise) ? 0.5 : 0); };
   blocks.forEach(b=>{ if (b.nm==='RELEASE') b.idx.sort((x,y)=>wuRank(x)-wuRank(y) || x-y); });
   let wuLast = '';
+  const dsBtns = k => `<span class="ds" data-k="${k}"><button data-s="done"${wuStatus[k]==='done'?' class="on"':''}>✓ Done</button><button data-s="skip"${wuStatus[k]==='skip'?' class="on"':''}>Skip</button></span>`;
   const card = idx => { const it = items[idx];
     const tg = it.tempo||'';
     if (WU.has(tg)) {
       if (tg==='COACH') return `<div class="meta" style="font-style:italic">Coach note: ${it.exercise}</div>`;
-      if (tg==='FOAM') return `<div class="card" style="background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em">${it.exercise.replace(/\s*-->\s*/g,' → ').replace(/➡️/g,'→')}</div>`;
+      if (tg==='FOAM') return `<div class="card" style="background:var(--ink);color:#fff;font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${it.exercise.replace(/\s*-->\s*/g,' → ').replace(/➡️/g,'→')}</span>${dsBtns('foam')}</div>`;
       if (tg==='SET') return `<h2 style="margin:10px 0 0">${it.exercise}</h2>`;
-      const head = wuLast!==tg ? `<div style="background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:22px;letter-spacing:.06em;border-radius:8px;padding:6px 12px;margin-top:16px"><span style="color:var(--red)">${tg==='TURF'?'1':'2'}</span> ${tg==='TURF'?'Turf Drills':'Lunges, Hips + Crawl'}</div>` : '';
+      const head = wuLast!==tg ? `<div style="background:var(--ink);color:#fff;font-family:'Bebas Neue';font-size:22px;letter-spacing:.06em;border-radius:8px;padding:6px 12px;margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:10px"><span><span style="color:var(--red)">${tg==='TURF'?'1':'2'}</span> ${tg==='TURF'?'Turf Drills':'Lunges, Hips + Crawl'}</span>${dsBtns(tg==='TURF'?'turf':'floor')}</div>` : '';
       wuLast = tg;
       return head + `<div class="card ex" data-idx="${idx}"><div class="exhead"><h3>${it.exercise.replace(/\bx\d+( each side)?/gi, m=>`<span style="color:var(--red)">${m}</span>`)}</h3><b>${schemeOf(it)}</b></div></div>`;
     }
-    const lw = last[it.exercise_id];
-    const sug = lw ? round5(lw * rule.load_pct/100) : null;
+    const head = `<div class="exhead"><h3><span class="lbl">${it.tempo||''}</span>${it.exercise}</h3><b>${schemeOf(it)}</b></div>
+      ${it.video_url?`<div class="meta"><a href="${it.video_url}" target="_blank">Video</a></div>`:''}`;
+    if (isCardio(it)) return `<div class="card ex cardioex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">${head}${cardioHtml(it)}</div>`;
+    const lift = it.sets && !/^(REACTIVE|RUN)/i.test(it.intensity||'');
+    const L = lastSets[it.exercise_id];
+    const pct = rule.load_pct/100;
     const p = prs[it.exercise_id] || {};
     const nSets = Math.max(1, it.sets || 3);
-    return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">
-      <div class="exhead"><h3><span class="lbl">${it.tempo||''}</span>${it.exercise}</h3><b>${schemeOf(it)}</b></div>
-      ${it.video_url?`<div class="meta"><a href="${it.video_url}" target="_blank">Video</a></div>`:''}
-      <div class="sugg">${(!it.sets || /^(REACTIVE|RUN)/i.test(it.intensity||'')) ? '' : lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
+    const wFor = s => { if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? round5(x.weight*pct) : ''; };
+    return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">${head}
+      <div class="sugg">${!lift ? '' : L ? `Last time: ${L.sets.map(x=>`${+x.weight} × ${x.reps}`).join(' · ')}${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
-      ${(!it.sets || /^(REACTIVE|RUN)/i.test(it.intensity||'')) ? '' : Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
-        <input type="number" inputmode="decimal" placeholder="lb" value="${sug||''}" data-w>
+      ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
+        <input type="number" inputmode="decimal" placeholder="lb" value="${wFor(s)}" data-w>
         <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(repsOf(it))||''}" data-r></div>`).join('')}
     </div>`; };
 
@@ -249,9 +287,16 @@ async function loadSession(){
 
 $('saveBtn').onclick = async () => {
   $('saveBtn').disabled = true;
+  const extra = { warmup: wuStatus, warmup_sets: [], cardio: [] };
+  document.querySelectorAll('.ex').forEach(card=>{ const it = items[+card.dataset.idx];
+    card.querySelectorAll('.wset').forEach((row,s)=>{ const w=parseFloat(row.querySelector('[data-w]').value), r=parseInt(row.querySelector('[data-r]').value);
+      if (w||r) extra.warmup_sets.push({exercise_id: it.exercise_id, exercise: it.exercise, set: s+1, weight: w||null, reps: r||null}); });
+    const c = card.querySelector('.cardio'); if (c) { const o = {exercise_id: it.exercise_id, exercise: it.exercise};
+      c.querySelectorAll('[data-c]').forEach(f=>{ if (f.value) o[f.dataset.c] = f.tagName==='SELECT' ? f.value : (f.dataset.c==='time' ? f.value : parseFloat(f.value)); });
+      if (o.time || o.distance || o.watts || o.max_watts || o.cadence || o.cals || o.speed) extra.cardio.push(o); } });
   const { data: wl, error } = await sb.from('workout_logs').insert({
     member_id: member.id, session_id: items[0] && items[0].session_id,
-    entered_by: enteredBy, readiness_id: readiness && readiness.id }).select().single();
+    entered_by: enteredBy, readiness_id: readiness && readiness.id, notes: JSON.stringify(extra) }).select().single();
   if (error) { alert('Could not save. Try again.'); $('saveBtn').disabled=false; return; }
   const rows = [];
   document.querySelectorAll('.ex').forEach(card=>{
