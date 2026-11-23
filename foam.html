@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EMPWR Foam Roll</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--onyx:#12161F;--red:#EB5345;--card:#F3F4F6}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#fff;color:var(--onyx);font-family:Montserrat,sans-serif;overflow:hidden}
+#foam{height:100vh;display:none;flex-direction:column;padding:2vh 2.4vw;gap:1.4vh}
+header{display:flex;align-items:center;gap:1.4vw}
+header img{height:8vh}
+header .t{font-family:'Bebas Neue';font-size:6.5vh;letter-spacing:.04em;line-height:1}
+header .s{font-family:'Mr Dafoe';color:var(--red);font-size:5vh;line-height:1}
+header .cd{margin-left:auto;text-align:right;font-family:'Bebas Neue';line-height:1}
+header .cd small{display:block;font-size:2.2vh;letter-spacing:.06em;opacity:.7}
+header .cd b{font-size:6.5vh;color:var(--red);font-weight:400}
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:1fr 1fr;gap:1.4vh 1.2vw}
+.tile{grid-column:span 2;display:flex;flex-direction:column;min-height:0;background:var(--card);border-radius:1.2vh;overflow:hidden}
+.tile:nth-child(4){grid-column:2 / span 2}
+.tile:nth-child(5){grid-column:4 / span 2}
+.lbl{display:flex;align-items:center;gap:.8vw;padding:.6vh 1vw;font-family:'Bebas Neue';font-size:3.6vh;letter-spacing:.05em}
+.lbl b{background:var(--red);color:#fff;border-radius:50%;width:4.6vh;height:4.6vh;display:grid;place-items:center;font-weight:400;flex:none}
+.vw{flex:1;min-height:0;background:#000}
+.vw iframe{width:100%;height:100%;border:0;display:block}
+#idle{position:fixed;inset:0;border:0;width:100%;height:100%;display:none}
+</style></head>
+<body>
+<section id="foam">
+  <header>
+    <img src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
+    <span class="t">Foam Roll</span><span class="s">Glutes → Calves → Quads → Groin → Lats</span>
+    <div class="cd"><small id="cdl">Session starts in</small><b id="cd">10:00</b></div>
+  </header>
+  <div id="grid"></div>
+</section>
+<iframe id="idle" title="Today's lift"></iframe>
+<script>
+// Foam roll videos from the EMPWR Exercise Video Library (#131, #130, #129, #132, #128), in the order members roll
+const VIDS = [['Glutes','dqq7NiCjcO4'],['Calves','Z9Bzmqm8HXQ'],['Quads','r-P6UQabO0k'],['Groin','JR3xEW2Pr9M'],['Lats','kZna7n_WL1A']];
+// Session start times (24h). Change with ?times=7:00,8:00,17:00
+const P = new URLSearchParams(location.search);
+const TIMES = (P.get('times') || '7:00,8:00,11:30,12:30,17:00,18:00').split(',')
+  .map(t => { const [h,m] = t.trim().split(':').map(Number); return h*60 + (m||0); });
+const BEFORE = +(P.get('before') || 10), AFTER = +(P.get('after') || 5);
+const IDLE = P.get('idle') || 'tv.html';   // what this TV shows outside the foam roll window
+const pad = n => String(Math.floor(n)).padStart(2,'0');
+const embed = id => `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0&playsinline=1&modestbranding=1`;
+let active = null;
+
+function inWindow(){
+  const d = new Date(), m = d.getHours()*60 + d.getMinutes() + d.getSeconds()/60;
+  for (const t of TIMES) if (m >= t - BEFORE && m < t + AFTER) return { t, m };
+  return null;
+}
+function tick(){
+  const w = inWindow(), on = !!w || P.has('always');
+  if (on !== active){
+    active = on;
+    document.getElementById('foam').style.display = on ? 'flex' : 'none';
+    // videos only load (and play) during the window
+    document.getElementById('grid').innerHTML = on ? VIDS.map((v,i)=>
+      `<div class="tile"><div class="lbl"><b>${i+1}</b>${v[0]}</div><div class="vw"><iframe src="${embed(v[1])}" allow="autoplay; encrypted-media" title="Foam Roll ${v[0]}"></iframe></div></div>`).join('') : '';
+    const f = document.getElementById('idle');
+    f.style.display = on ? 'none' : 'block';
+    if (!on && IDLE !== 'none' && !f.src) f.src = IDLE;
+  }
+  if (w){
+    const diff = (w.t - w.m) * 60, s = Math.abs(diff);
+    document.getElementById('cdl').textContent = diff > 0 ? 'Session starts in' : 'Session started';
+    document.getElementById('cd').textContent = `${pad(s/60)}:${pad(s%60)}`;
+  }
+}
+tick(); setInterval(tick, 1000);
+</script></body></html>
