@@ -34,6 +34,11 @@ header .cd b{font-size:6.5vh;color:var(--red);font-weight:400}
 .vw{position:relative;overflow:hidden}
 .vw iframe{transform:scale(1.22);transform-origin:center}
 .vw::after{content:'';position:absolute;inset:0;z-index:2}
+/* see-through labels over the video so the whole drill shows */
+.tile{position:relative}
+.lbl{position:absolute;top:0;left:0;right:0;z-index:3;background:rgba(18,22,31,.45)!important}
+.tile.after .lbl{background:rgba(235,83,69,.6)!important}
+.vw iframe{transform:scale(1.1)!important}
 /* 6 tiles: 3 + 3, and the after-foam-roll drill outlined in red */
 #grid.six .tile:nth-child(n){grid-column:span 2}
 .tile.after{outline:.6vh solid var(--red);outline-offset:-.6vh}
@@ -103,22 +108,25 @@ function draw(key){
 }
 // YouTube players: muted, slowed down, restart just before the end so no pause/end screen shows
 const RATE = +(P.get('speed') || 0.75);
+// Stop before the outro card (seconds)
+const ENDS = { '7CU2rovveHM': 37.3 };
 let players = [];
 function mountPlayers(){
   players.forEach(p => { try { p.destroy(); } catch(e){} }); players = [];
   if (!(window.YT && YT.Player)) { window.onYouTubeIframeAPIReady = mountPlayers; return; }
   document.querySelectorAll('.yt').forEach(el => {
-    players.push(new YT.Player(el, { videoId: el.dataset.id,
+    const pl = new YT.Player(el, { videoId: el.dataset.id,
       playerVars: { autoplay:1, mute:1, controls:0, rel:0, playsinline:1, modestbranding:1, disablekb:1, fs:0, iv_load_policy:3 },
       events: {
         onReady: e => { e.target.mute(); e.target.setPlaybackRate(RATE); e.target.playVideo(); },
         onStateChange: e => { if (e.data === YT.PlayerState.ENDED || e.data === YT.PlayerState.PAUSED) { e.target.seekTo(0, true); e.target.playVideo(); } }
-      } }));
+      } });
+    pl.__end = ENDS[el.dataset.id]; players.push(pl);
   });
 }
 setInterval(() => players.forEach(p => { try {
   const d = p.getDuration(), t = p.getCurrentTime();
-  if (d && t > d - 0.8) p.seekTo(0, true);
+  if (d && t > (p.__end || d - 0.8)) p.seekTo(0, true);
   if (p.getPlaybackRate && p.getPlaybackRate() !== RATE) p.setPlaybackRate(RATE);
 } catch(e){} }), 300);
 function tick(){
