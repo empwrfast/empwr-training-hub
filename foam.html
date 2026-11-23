@@ -98,7 +98,7 @@ function now(){
 function draw(key){
   const pg = SCREENS[key];
   document.getElementById('pt').innerHTML = `<span class="stp">${pg.step}</span>${pg.title}<span class="nt">${pg.note}</span>`;
-  document.getElementById('ps').textContent = pg.vids.length > 1 ? pg.vids.map(v=>v[0]).join(' → ') : '';
+  document.getElementById('ps').textContent = key !== 'foam' && pg.vids.length > 1 ? pg.vids.map(v=>v[0]).join(' → ') : '';
   const g = document.getElementById('grid');
   g.innerHTML = pg.vids.map((v,i)=>
     `<div class="tile${v[2]?' after':''}"><div class="lbl"><b>${i+1}</b>${v[0]}</div><div class="vw">${v[1] ? `<div class="yt" data-id="${v[1]}"></div>` : `<div class="novid">${v[0]}</div>`}</div></div>`).join('');
