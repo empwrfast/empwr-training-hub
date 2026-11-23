@@ -91,6 +91,7 @@ body.dark .wuh{background:var(--card)}
 .wn{font-family:'Bebas Neue';font-size:3.1vh;line-height:1.05}
 .wr{font-family:'Bebas Neue';font-size:2.7vh;color:var(--red);white-space:nowrap}
 /* compact warm-up */
+.rr{color:var(--red);font-style:normal}
 .foam{font-size:3.2vh;padding:.7vh 1.2vw}
 .setlbl{font-size:3.6vh;margin:.5vh 0 0}
 .wusec{gap:.5vh}
@@ -187,7 +188,7 @@ function releaseHtml(list){
   const by = t => list.filter(r => (r.tempo||'') === t);
   const crawlLast = (a,b) => /KOMODO|CRAWL/i.test(a.exercise) - /KOMODO|CRAWL/i.test(b.exercise);
   const rest = list.filter(r => !WU.test(r.tempo||''));
-  const row = r => `<div class="wu"><span class="wn">${r.exercise}</span><span class="wr">${scheme(r)||''}</span></div>`;
+  const row = r => `<div class="wu"><span class="wn">${r.exercise.replace(/\bx\d+( each side)?/gi, m=>`<em class="rr">${m}</em>`)}</span><span class="wr">${scheme(r)||''}</span></div>`;
   const sec = (n, title, rows) => rows.length ? `<div class="wusec"><div class="wuh"><b>${n}</b>${title}</div>${rows.map(row).join('')}</div>` : '';
   return by('COACH').map(c=>`<div class="coachnote">Coach note: ${c.exercise}</div>`).join('') +
     by('FOAM').map(f=>`<div class="foam">${f.exercise.replace(/\s*-->\s*/g,' → ').replace(/➡️/g,'→')}</div>`).join('') +
