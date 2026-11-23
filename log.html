@@ -191,18 +191,31 @@ async function loadSession(){
 
   // Blank sets/reps = same as the exercise before it in the block
   blocks.forEach(b=>b.idx.forEach((ix,k)=>{ const it=items[ix];
-    if (it.tempo && !it.sets && !repsOf(it) && k>0){ const pv=items[b.idx[k-1]]; it.sets=pv.sets; it.reps=pv.reps; } }));
+    if (it.tempo && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo) && !it.sets && !repsOf(it) && k>0){ const pv=items[b.idx[k-1]]; it.sets=pv.sets; it.reps=pv.reps; } }));
   const letterOf = it => ((it.tempo||'').match(/^[A-Z]/i)||[''])[0].toUpperCase();
   const gapSet = new Set();
   const blockHtml = b => { let html='', prev=null; const L=b.idx;
     for (let k=0;k<L.length;k++){ const it=items[L[k]], lbl=it.tempo||'', le=letterOf(it);
       const gap = prev!==null && le && le!==prev; prev = le||prev;
-      if (lbl && L[k+1]!==undefined && items[L[k+1]].tempo===lbl){
+      if (lbl && !WU.has(lbl) && L[k+1]!==undefined && items[L[k+1]].tempo===lbl){
         const grp=[L[k]]; while(L[k+1]!==undefined && items[L[k+1]].tempo===lbl) grp.push(L[++k]);
         html += `<div class="choose${gap?' gap':''}"><div class="chz">Choose 1</div>${grp.map(card).join('<div class="or">or</div>')}</div>`;
       } else { if (gap) gapSet.add(L[k]); html += card(L[k]); gapSet.delete(L[k]); }
     } return html; };
+  const WU = new Set(['COACH','FOAM','SET','TURF','FLOOR']);
+  const wuRank = ix => { const it = items[ix], t = it.tempo||''; return ({COACH:0,FOAM:1,SET:2,TURF:3,FLOOR:5}[t] ?? 4) + (t==='FLOOR' && /KOMODO|CRAWL/i.test(it.exercise) ? 0.5 : 0); };
+  blocks.forEach(b=>{ if (b.nm==='RELEASE') b.idx.sort((x,y)=>wuRank(x)-wuRank(y) || x-y); });
+  let wuLast = '';
   const card = idx => { const it = items[idx];
+    const tg = it.tempo||'';
+    if (WU.has(tg)) {
+      if (tg==='COACH') return `<div class="meta" style="font-style:italic">Coach note: ${it.exercise}</div>`;
+      if (tg==='FOAM') return `<div class="card" style="background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em">${it.exercise.replace(/\s*-->\s*/g,' → ').replace(/➡️/g,'→')}</div>`;
+      if (tg==='SET') return `<h2 style="margin:10px 0 0">${it.exercise}</h2>`;
+      const head = wuLast!==tg ? `<div style="background:var(--onyx);color:#fff;font-family:'Bebas Neue';font-size:22px;letter-spacing:.06em;border-radius:8px;padding:6px 12px;margin-top:16px"><span style="color:var(--red)">${tg==='TURF'?'1':'2'}</span> ${tg==='TURF'?'Turf Drills':'Lunges, Hips + Crawl'}</div>` : '';
+      wuLast = tg;
+      return head + `<div class="card ex" data-idx="${idx}"><div class="exhead"><h3>${it.exercise}</h3><b>${schemeOf(it)}</b></div></div>`;
+    }
     const lw = last[it.exercise_id];
     const sug = lw ? round5(lw * rule.load_pct/100) : null;
     const p = prs[it.exercise_id] || {};
