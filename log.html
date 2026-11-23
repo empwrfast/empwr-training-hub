@@ -223,9 +223,9 @@ async function loadSession(){
     return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">
       <div class="exhead"><h3><span class="lbl">${it.tempo||''}</span>${it.exercise}</h3><b>${schemeOf(it)}</b></div>
       ${it.video_url?`<div class="meta"><a href="${it.video_url}" target="_blank">Video</a></div>`:''}
-      <div class="sugg">${!it.sets ? '' : lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
+      <div class="sugg">${(!it.sets || /^(REACTIVE|RUN)/i.test(it.intensity||'')) ? '' : lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
-      ${!it.sets ? '' : Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
+      ${(!it.sets || /^(REACTIVE|RUN)/i.test(it.intensity||'')) ? '' : Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${sug||''}" data-w>
         <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(repsOf(it))||''}" data-r></div>`).join('')}
     </div>`; };
