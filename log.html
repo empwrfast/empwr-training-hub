@@ -36,6 +36,27 @@ button.main{font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;width:1
 footer{position:fixed;bottom:8px;right:12px}
 footer img{height:40px}
 a{color:var(--red)}
+
+/* ===== v2: blocks like the TV ===== */
+body{max-width:900px}
+#phaseLine{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+#phaseLine .ph{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em}
+#phaseLine .cur{font-family:'Mr Dafoe';color:var(--red);font-size:34px;line-height:1}
+#sessSub{font-family:'Bebas Neue';color:var(--fg);opacity:.6;font-size:20px;letter-spacing:.05em;margin:0 0 6px}
+#tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding:8px 0}
+#tabs button{flex:1 0 auto;font-family:'Bebas Neue';font-size:20px;letter-spacing:.05em;padding:10px 14px;border-radius:10px;border:2px solid var(--red);background:var(--bg);color:var(--red);cursor:pointer}
+#tabs button.on{background:var(--red);color:#fff}
+#tabs button.done::after{content:' ✓'}
+.band{display:flex;justify-content:space-between;align-items:center;background:var(--red);color:#fff;border-radius:10px;padding:8px 14px;margin-top:6px}
+.band .l{display:flex;align-items:baseline;gap:12px}
+.band .nm{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em;line-height:1}
+.band .q{font-family:'Mr Dafoe';font-size:26px;line-height:1}
+.band .tm{font-family:'Bebas Neue';font-size:18px;letter-spacing:.06em}
+.exhead h3 .lbl{color:var(--red);margin-right:8px}
+.blknav{display:flex;gap:10px;margin-top:8px}
+.blknav button{flex:1;font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;padding:14px;border-radius:10px;cursor:pointer;border:2px solid var(--red);background:var(--bg);color:var(--red)}
+.blknav button.go{background:var(--red);color:#fff}
+.set input{font-size:20px;padding:14px}
 </style></head>
 <body>
 <header>
@@ -140,21 +161,57 @@ async function loadSession(){
   const { data: pr } = await sb.from('personal_records').select('*').eq('member_id',member.id).in('exercise_id',ids);
   (pr||[]).forEach(r => { (prs[r.exercise_id] ||= {})[r.pr_type] = r.value; });
 
-  $('exList').innerHTML = items.map((it,idx)=>{
+  // Phase line, like the TV
+  const t = (items[0].title||'').trim();
+  const tc = x => x === x.toUpperCase() ? x.toLowerCase().replace(/(^|\s|&)(\w)/g,(m,a,b)=>a+b.toUpperCase()) : x;
+  const ph = (t.match(/\[\s*(phase\s*\d+)\s*\]/i)||[])[1] || '';
+  const aim = t.split('--').pop().replace(/\[.*?\]/g,'').trim();
+  $('sessTitle').innerHTML = `<div id="phaseLine"><span class="ph">${ph ? tc(ph) : ''}</span><span class="cur">${tc(aim)}</span></div>`;
+  const d = new Date();
+  $('sessSub').textContent = `${d.toLocaleDateString('en-CA',{weekday:'long'})} · ${d.toLocaleDateString('en-CA',{month:'short',day:'numeric'}).replace(/\./g,'')} · Week ${items[0].week}`;
+
+  // Group into blocks exactly like the TV
+  const blocks = []; let cur = null;
+  items.forEach((it,idx)=>{
+    const raw = (it.intensity||'').replace(/\s+/g,' ').trim();
+    const nm = raw.replace(/\[.*?\]/g,'').trim().split(' ')[0] || 'Today';
+    let q = (raw.match(/\[(.*?)\]/)||[])[1] || raw.replace(/\[.*?\]/g,'').trim().split(' ').slice(1).join(' ');
+    if (nm.includes('☠')) q = 'Choose 🤗 1';
+    if (!cur || cur.nm !== nm){ cur = {nm, q: tc(q), tm: it.rest||'', idx: []}; blocks.push(cur); }
+    cur.idx.push(idx);
+  });
+  const repsOf = it => String(it.reps||'').split('|').pop().trim();
+  const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} sets`) : repsOf(it);
+
+  const card = idx => { const it = items[idx];
     const lw = last[it.exercise_id];
     const sug = lw ? round5(lw * rule.load_pct/100) : null;
     const p = prs[it.exercise_id] || {};
     const nSets = Math.max(1, it.sets || 3);
     return `<div class="card ex" data-idx="${idx}">
-      <div class="exhead"><h3>${String.fromCharCode(65+idx)}. ${it.exercise}</h3><b>${it.sets} x ${it.reps}</b></div>
-      <div class="meta">${[it.tempo&&'Tempo '+it.tempo, it.rest&&'Rest '+it.rest, it.intensity].filter(Boolean).join(' | ')}
-        ${it.video_url?` | <a href="${it.video_url}" target="_blank">Video</a>`:''}</div>
+      <div class="exhead"><h3><span class="lbl">${it.tempo||''}</span>${it.exercise}</h3><b>${schemeOf(it)}</b></div>
+      ${it.video_url?`<div class="meta"><a href="${it.video_url}" target="_blank">Video</a></div>`:''}
       <div class="sugg">${lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
       ${Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${sug||''}" data-w>
-        <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(it.reps)||''}" data-r></div>`).join('')}
-    </div>`;}).join('');
+        <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(repsOf(it))||''}" data-r></div>`).join('')}
+    </div>`; };
+
+  $('exList').innerHTML =
+    `<div id="tabs">${blocks.map((b,i)=>`<button data-b="${i}">${b.nm}</button>`).join('')}</div>` +
+    blocks.map((b,i)=>`<div class="blk" data-b="${i}">
+      <div class="band"><div class="l"><span class="nm">${b.nm}</span><span class="q">${b.q}</span></div><span class="tm">${b.tm ? b.tm+' min' : ''}</span></div>
+      ${b.idx.map(card).join('')}
+      <div class="blknav">${i>0?`<button data-go="${i-1}">‹ ${blocks[i-1].nm}</button>`:''}${i<blocks.length-1?`<button class="go" data-go="${i+1}">Next: ${blocks[i+1].nm} ›</button>`:''}</div>
+    </div>`).join('');
+  const showBlock = i => {
+    document.querySelectorAll('.blk').forEach(el=>el.classList.toggle('hidden', +el.dataset.b !== i));
+    document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', +b.dataset.b === i));
+    scrollTo(0,0);
+  };
+  document.querySelectorAll('#tabs button, .blknav button').forEach(b=>b.onclick=()=>showBlock(+(b.dataset.b ?? b.dataset.go)));
+  showBlock(0);
   show('stepSession');
 }
 
