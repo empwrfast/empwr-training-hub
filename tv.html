@@ -108,7 +108,6 @@ aside{gap:1.4vh}
 #qr{padding:1vh;margin:1vh 0}
 #qr img,#qr canvas{width:14vh!important;height:14vh!important}
 .big{font-size:7vh}
-aside .box:nth-child(3){display:none}
 .foam{font-size:4.6vh;padding:1vh 1.4vw}
 .setlbl{font-size:5vh;margin:.6vh 0 .2vh}
 .wuh{font-size:3.8vh;padding:.6vh 1vw}
@@ -126,6 +125,7 @@ aside .box:nth-child(3){display:none}
 .wu{padding:calc(1vh*var(--k,1)) 1.1vw;gap:1vw}
 .wusec{gap:calc(.8vh*var(--k,1))}
 .coachnote{font-size:calc(2.6vh*var(--k,1))}
+.lift .note{white-space:normal;line-height:1.25;font-size:2.4vh}
 </style></head>
 <body>
 <header>
@@ -226,13 +226,18 @@ function draw(){
   const el = document.getElementById('lifts');
   if (!pages.length){ el.innerHTML = '<div class="empty">No session programmed for today.</div>'; return; }
   if (pageIdx >= pages.length) pageIdx = 0;
+  // Week-4 style 'MAX @ wk 1 wt': spell out how the sets run
+  const maxRule = it => { const r = String(it.reps||''); if (!/MAX/i.test(r) || !/wk\s*1/i.test(r)) return '';
+    const rg = r.match(/MAX\s*(\d+)\s*-\s*(\d+)/i);
+    const uni = /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|OVR\s*UNDER|MIXED|EACH SIDE/i.test(it.exercise) || /\d+e\b/i.test(r);
+    return `Use Your Top Week 1 Weight. Sets 1 + 2: Same Reps As Last Week. Set 3: Max Reps${rg ? ` (Min ${rg[1]}, Max ${rg[2]})` : ''}${uni ? '. One Side, Go Do The Rest, Then Come Back For The Other Side' : ''}.`; };
   const pg = pages[pageIdx];
   el.classList.toggle('many', pg.items.length > 6 && pg.nm !== 'RELEASE');
   el.innerHTML =
     `<div id="band"><div class="l"><span class="nm">${pg.nm}</span><span class="q">${pg.q}</span></div>`+
     `<span class="tm">${pg.tm ? pg.tm+' min' : ''}</span></div>`+
     (pg.nm === 'RELEASE' ? releaseHtml(pg.items) : groupHtml(pg.items, (r,gap)=>`<div class="lift${gap?' gap':''}"><div class="n">${r.tempo||''}</div>
-      <div><div class="ex">${r.exercise}</div></div>
+      <div><div class="ex">${r.exercise}</div>${maxRule(r) ? `<div class="note">${maxRule(r)}</div>` : ''}</div>
       <div class="scheme">${scheme(r)}</div></div>`))+
     `<div id="navrow"><button class="nb" data-d="-1">‹</button>${pages.map((_,j)=>`<span class="dot${j===pageIdx?' on':''}" data-j="${j}"></span>`).join('')}<button class="nb" data-d="1">›</button></div>`;
   el.querySelectorAll('.dot').forEach(d=>d.onclick=()=>{ pageIdx = +d.dataset.j; draw(); });
