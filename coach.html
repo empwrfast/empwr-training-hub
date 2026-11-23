@@ -8,8 +8,13 @@
 :root{--ink:#12161F;--red:#EB5345;--bg:#fff;--fg:#12161F;--card:#F3F4F6;--line:#D9DCE1;--mute:#8a8f98}
 *{box-sizing:border-box;margin:0}
 body{background:var(--bg);color:var(--fg);font-family:Montserrat,sans-serif;max-width:1000px;margin:auto;padding:16px 16px 120px}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-header img{height:44px}
+header{display:flex;align-items:center;gap:16px;margin-bottom:10px}
+header img{height:44px;flex:0 0 auto}
+#hdrT{flex:1;min-width:0;display:flex;align-items:center;gap:12px;overflow:hidden;white-space:nowrap}
+#hdrT .ph{font-family:'Bebas Neue';font-size:26px;letter-spacing:.04em}
+#hdrT .cur{font-family:'Mr Dafoe';color:var(--red);font-size:44px;line-height:1.1}
+#dt{font-family:'Bebas Neue';font-size:16px;letter-spacing:.05em;white-space:nowrap;flex:0 0 auto;color:#5d626b}
+#sess{font:inherit;letter-spacing:inherit;color:#fff;background:var(--ink);border:0;border-radius:6px;padding:3px 8px;cursor:pointer}
 h1{font-family:'Bebas Neue';font-size:40px;letter-spacing:.04em;line-height:1}
 h2{font-family:'Mr Dafoe';font-weight:400;font-size:34px;margin:-4px 0 10px}
 .card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}
@@ -25,7 +30,7 @@ button{font:inherit;cursor:pointer}
 #tabs{display:flex;gap:8px;overflow-x:auto;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
 #tabs button{flex:1 0 auto;font-family:'Bebas Neue';font-size:20px;letter-spacing:.05em;padding:10px 14px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--fg)}
 #tabs button.on{background:var(--red);border-color:var(--red);color:#fff}
-.band{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:10px;padding:8px 14px;margin-top:6px}
+.band{display:flex;justify-content:space-between;align-items:center;background:var(--red);color:#fff;border-radius:10px;padding:8px 14px;margin-top:6px}
 .band .nm{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em}
 .band .q{font-family:'Mr Dafoe';font-size:28px;margin-left:12px}
 .ex{border-left:6px solid var(--line)}
@@ -47,6 +52,7 @@ button{font:inherit;cursor:pointer}
 .st input[data-w]::placeholder{color:#b5b9c0}
 .plus{border:1px dashed var(--line);background:none;border-radius:10px;padding:0 12px;font-weight:700;color:var(--mute)}
 .mtot{font-size:12px;color:var(--mute);margin-top:6px}
+.cgrid{display:flex;flex-wrap:wrap;gap:8px}.cf{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:800;color:var(--mute);text-transform:uppercase}.cf input{width:90px;padding:8px;font-size:16px;text-align:center}.cf select{padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit}
 .chz{font-family:'Bebas Neue';font-size:20px;letter-spacing:.08em;margin:14px 0 -4px}
 #bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px}
 #bar .in{max-width:1000px;margin:auto}
@@ -56,6 +62,8 @@ button{font:inherit;cursor:pointer}
 <body>
 <header>
   <img src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
+  <div id="hdrT"><span class="ph" id="phase"></span><span class="cur" id="aim"></span></div>
+  <div id="dt"></div>
 </header>
 
 <!-- STEP 1: pick members -->
@@ -72,7 +80,7 @@ button{font:inherit;cursor:pointer}
 
 <!-- STEP 2: board -->
 <section id="stepBoard" class="hidden">
-  <h1 id="title">Today's Lift</h1><h2 id="sub"></h2>
+  <h2 id="sub"></h2>
   <div class="card" style="padding:10px 14px"><input id="late" placeholder="+ Add A Name (late arrival)" autocomplete="off"><div id="lateRes"></div></div>
   <div id="board"></div>
   <div id="bar"><div class="in"><button class="main" id="saveAll" style="margin:0">Save All</button></div></div>
@@ -108,6 +116,16 @@ $('chips').onclick = e => { const b = e.target.closest('.chip'); if (!b) return;
 function drawChips(){ $('chips').innerHTML = picked.map(p => `<button class="chip" data-id="${p.id}">${p.name}</button>`).join('');
   $('startBtn').disabled = !picked.length; $('startBtn').textContent = picked.length ? `Start Logging (${picked.length})` : 'Start Logging'; }
 $('startBtn').onclick = load;
+// top line like the TV: logo, phase, aim in cursive (as big as it fits), day / date / week
+// session time: defaults to the session closest to now, tap to switch
+const SESS = [['7:00 AM', 420], ['8:00 AM', 480], ['11:30 AM', 690], ['12:30 PM', 750], ['5:00 PM', 1020], ['6:00 PM', 1080]];
+let sessIdx = (() => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); let k = 0; SESS.forEach((x, i) => { if (m >= x[1] - 15) k = i; }); return k; })();
+document.addEventListener('click', e => { if (e.target.id !== 'sess') return; sessIdx = (sessIdx + 1) % SESS.length; e.target.textContent = SESS[sessIdx][0]; });
+function setHeader(r){ const t = (r.title || '').trim(), ph = (t.match(/\[\s*(phase\s*\d+)\s*\]/i) || [])[1] || '';
+  $('phase').textContent = ph ? tc(ph.toUpperCase()).replace(/\s+/, ' ') : ''; $('aim').textContent = tc(t.split('--').pop().replace(/\[.*?\]/g, '').trim());
+  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · Week ${r.week} · <button id="sess" title="Tap to change session">${SESS[sessIdx][0]}</button>`;
+  const a = $('aim'), box = $('hdrT'); let f = 44; a.style.fontSize = f + 'px'; while (box.scrollWidth > box.clientWidth && f > 18) { f--; a.style.fontSize = f + 'px'; } }
+sb.from('todays_session').select('title,week').limit(1).then(({ data }) => { if (data && data[0]) setHeader(data[0]); });
 // who's here: everyone who checked in on the iPad today shows up on their own (tap ✕ to drop a no-show)
 (async () => { const d = new Date(), days = [d.toLocaleDateString('en-CA'), d.toISOString().slice(0, 10)];
   const { data: ck } = await sb.from('readiness_checkins').select('member_id').in('checkin_date', days);
@@ -139,10 +157,19 @@ let lt; $('late').oninput = e => { clearTimeout(lt); lt = setTimeout(async () =>
     .map(m => `<button data-id="${m.id}" data-n="${esc(m.first_name)} ${esc(m.last_name)}" style="display:block;width:100%;text-align:left;padding:10px;margin-top:6px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:600">${esc(m.first_name)} ${esc(m.last_name)}</button>`).join(''); }, 250); };
 $('lateRes').onclick = async e => { const b = e.target.closest('button'); if (!b) return; const p = { id: b.dataset.id, name: b.dataset.n };
   picked.push(p); $('late').value = ''; $('lateRes').innerHTML = ''; await loadHist([p.id]);
-  document.querySelectorAll('.ex').forEach(card => card.insertAdjacentHTML('beforeend', rowHtml(p, items[+card.dataset.idx])));
-  $('sub').textContent = `Week ${items[0].week} · ${picked.map(x => x.name.split(' ')[0]).join(', ')}`; totals(); };
+  document.querySelectorAll('.ex').forEach(card => { const it = items[+card.dataset.idx]; card.insertAdjacentHTML('beforeend', isCardio(it) ? cardioRow(p, it) : rowHtml(p, it)); });
+  $('sub').textContent = picked.map(x => x.name.split(' ')[0]).join(', '); totals(); };
 const repsOf = it => String(it.reps || '').split('|').pop().trim();
 const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets > 1 ? 's' : ''}`) : repsOf(it);
+const isCardio = it => /^RESILIENCY/i.test((it.intensity || '').trim()) && !!(it.exercise || '').trim();
+// default distance unit per machine at EMPWR
+const unitFor = n => /versa/i.test(n) ? 'ft' : /true\s*form/i.test(n) ? 'km' : /woodway|4\s*front/i.test(n) ? 'mi' : /echo|bike/i.test(n) ? 'mi' : /ski|row/i.test(n) ? 'm' : /treadmill/i.test(n) ? 'km' : 'm';
+function cardioRow(p, it){ const n = it.exercise, u = unitFor(n), f = (k, ph, lab) => `<label class="cf">${lab}<input type="${k === 'time' ? 'text' : 'number'}" inputmode="${k === 'time' ? 'numeric' : 'decimal'}" placeholder="${ph}" data-c="${k}"></label>`;
+  const tm = /treadmill|woodway|4\s*front|true\s*form/i.test(n), incl = /treadmill|woodway|4\s*front/i.test(n), bike = /echo|bike/i.test(n), spd = u === 'mi' ? 'mph' : 'km/h';
+  const extra = tm ? f('speed', spd, 'Speed') + (incl ? f('incline', '%', 'Incline') : f('cals', 'cal', 'Cals'))
+    : bike ? f('watts', 'W', 'Avg W') + f('max_watts', 'W', 'Max W') + f('cadence', 'rpm', 'RPM') + f('cals', 'cal', 'Cals') : f('watts', 'W', 'Avg W') + f('cals', 'cal', 'Cals');
+  return `<div class="mrow crow" data-m="${p.id}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.</div>
+    <div class="cgrid">${f('time', 'min:sec', 'Time')}<label class="cf">Distance<span style="display:flex;gap:4px"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x => `<option${x === u ? ' selected' : ''}>${x}</option>`).join('')}</select></span></label>${extra}</div></div>`; }
 const isLift = it => it.sets && !/^(RELEASE|REACTIVE|RUN|RESILIENCY)/i.test((it.intensity || '').trim()) && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo || '');
 
 async function load(){
@@ -159,13 +186,12 @@ async function load(){
   const ids = items.map(i => i.exercise_id).filter(Boolean);
   last = {}; await loadHist(picked.map(p => p.id));
 
-  const t0 = (items[0].title || '').trim();
-  $('title').textContent = tc(t0.split('--').pop().replace(/\[.*?\]/g, '').trim()) || "Today's Lift";
-  $('sub').textContent = `Week ${items[0].week} · ${picked.map(p => p.name.split(' ')[0]).join(', ')}`;
+  setHeader(items[0]);
+  $('sub').textContent = picked.map(p => p.name.split(' ')[0]).join(', ');
 
   // blocks, same grouping as the TV
   blocks = []; let cur = null;
-  items.forEach((it, idx) => { if (!isLift(it)) return;
+  items.forEach((it, idx) => { if (!isLift(it) && !isCardio(it)) return;
     const raw = (it.intensity || '').replace(/\s+/g, ' ').trim();
     if (!cur || cur.raw !== raw) { const nm = raw.replace(/\[.*?\]/g, '').trim().split(' ')[0];
       cur = { raw, nm, q: tc((raw.match(/\[(.*?)\]/) || [])[1] || ''), idx: [] }; blocks.push(cur); }
@@ -174,7 +200,7 @@ async function load(){
   const card = idx => { const it = items[idx], mult = /\de\b/i.test(repsOf(it)) ? 2 : 1;
     return `<div class="card ex" data-idx="${idx}" data-mult="${mult}">
       <div class="exhead"><h3><span class="lbl">${esc(it.tempo || '')}</span>${esc(it.exercise)}</h3><b>${esc(schemeOf(it))}</b></div>
-      ${picked.map(p => rowHtml(p, it)).join('')}
+      ${picked.map(p => isCardio(it) ? cardioRow(p, it) : rowHtml(p, it)).join('')}
     </div>`; };
   const blockHtml = b => { let h = ''; const L = b.idx;
     for (let k = 0; k < L.length; k++) { const lbl = items[L[k]].tempo;
@@ -205,27 +231,30 @@ $('board').addEventListener('input', totals);
 function totals(){ document.querySelectorAll('.ex').forEach(card => { const m = +card.dataset.mult || 1;
   card.querySelectorAll('.mrow').forEach(row => { let v = 0; row.querySelectorAll('.st').forEach(st => {
     const w = parseFloat(st.querySelector('[data-w]').value), r = parseInt(st.querySelector('[data-r]').value); if (w && r) v += w * r * m; });
-    row.querySelector('.mtot').textContent = v ? `Total Moved: ${fmt(v)} lb` : ''; }); }); }
+    const mt = row.querySelector('.mtot'); if (mt) mt.textContent = v ? `Total Moved: ${fmt(v)} lb` : ''; }); }); }
 
 // ===== SAVE ALL =====
 $('saveAll').onclick = async () => {
   // only sets with a weight typed in (or dropped in) get saved
-  const per = {}; picked.forEach(p => per[p.id] = { sets: [], lb: 0 });
+  const per = {}; picked.forEach(p => per[p.id] = { sets: [], lb: 0, cardio: [] });
+  document.querySelectorAll('.crow').forEach(row => { const it = items[+row.closest('.ex').dataset.idx], o = { exercise_id: it.exercise_id, exercise: it.exercise };
+    row.querySelectorAll('[data-c]').forEach(f => { if (f.value && f.dataset.c !== 'unit') o[f.dataset.c] = f.dataset.c === 'time' ? f.value : parseFloat(f.value); });
+    if (Object.keys(o).length > 2) { o.unit = row.querySelector('[data-c=unit]').value; per[row.dataset.m].cardio.push(o); } });
   document.querySelectorAll('.ex').forEach(card => { const it = items[+card.dataset.idx], m = +card.dataset.mult || 1;
     card.querySelectorAll('.mrow').forEach(row => { let n = 0; row.querySelectorAll('.st').forEach(st => {
       const w = parseFloat(st.querySelector('[data-w]').value), r = parseInt(st.querySelector('[data-r]').value);
       if (w && r && it.exercise_id) { per[row.dataset.m].sets.push({ exercise_id: it.exercise_id, set_number: ++n, weight: w, reps: r }); per[row.dataset.m].lb += w * r * m; } }); }); });
-  const todo = picked.filter(p => per[p.id].sets.length);
+  const todo = picked.filter(p => per[p.id].sets.length || per[p.id].cardio.length);
   if (!todo.length) { alert('Nothing to save yet. Enter at least one set.'); return; }
   if (!confirm(`Save for ${todo.map(p => p.name.split(' ')[0]).join(', ')}?`)) return;
   $('saveAll').disabled = true; $('saveAll').textContent = 'Saving...';
   const out = [];
   for (const p of todo) {
     const { data: wl, error } = await sb.from('workout_logs').insert({ member_id: p.id, session_id: items[0].session_id,
-      entered_by: 'coach', notes: JSON.stringify({ source: 'coach board' }) }).select().single();
+      entered_by: 'coach', notes: JSON.stringify({ source: 'coach board', session_time: SESS[sessIdx][0], cardio: per[p.id].cardio }) }).select().single();
     if (error) { out.push(`<div class="res"><span>${p.name}</span><span class="bad">Not saved, try again</span></div>`); continue; }
-    const { error: e2 } = await sb.from('set_logs').insert(per[p.id].sets.map(s => ({ ...s, workout_log_id: wl.id, member_id: p.id })));
-    out.push(`<div class="res"><span>${p.name}</span><span class="${e2 ? 'bad' : 'ok'}">${e2 ? 'Sets not saved' : `✓ ${fmt(per[p.id].lb)} lb moved`}</span></div>`);
+    const { error: e2 } = per[p.id].sets.length ? await sb.from('set_logs').insert(per[p.id].sets.map(s => ({ ...s, workout_log_id: wl.id, member_id: p.id }))) : { error: null };
+    out.push(`<div class="res"><span>${p.name}</span><span class="${e2 ? 'bad' : 'ok'}">${e2 ? 'Sets not saved' : `✓ ${fmt(per[p.id].lb)} lb moved${per[p.id].cardio.length ? ' + cardio' : ''}`}</span></div>`);
   }
   $('done').innerHTML = out.join(''); show('stepDone'); scrollTo(0, 0);
 };
