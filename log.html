@@ -183,7 +183,7 @@ async function loadSession(){
     const nm = raw.replace(/\[.*?\]/g,'').trim().split(' ')[0] || 'Today';
     let q = (raw.match(/\[(.*?)\]/)||[])[1] || raw.replace(/\[.*?\]/g,'').trim().split(' ').slice(1).join(' ');
     if (nm.includes('☠')) q = 'Choose 🤗 1';
-    if (!cur || cur.nm !== nm){ cur = {nm, q: tc(q), tm: it.rest||'', idx: []}; blocks.push(cur); }
+    if (!cur || cur.raw !== raw){ cur = {raw, nm, q: tc(q), tm: it.rest||'', idx: []}; blocks.push(cur); }
     cur.idx.push(idx);
   });
   const repsOf = it => String(it.reps||'').split('|').pop().trim();
@@ -191,7 +191,7 @@ async function loadSession(){
 
   // Blank sets/reps = same as the exercise before it in the block
   blocks.forEach(b=>b.idx.forEach((ix,k)=>{ const it=items[ix];
-    if (!it.sets && !repsOf(it) && k>0){ const pv=items[b.idx[k-1]]; it.sets=pv.sets; it.reps=pv.reps; } }));
+    if (it.tempo && !it.sets && !repsOf(it) && k>0){ const pv=items[b.idx[k-1]]; it.sets=pv.sets; it.reps=pv.reps; } }));
   const letterOf = it => ((it.tempo||'').match(/^[A-Z]/i)||[''])[0].toUpperCase();
   const gapSet = new Set();
   const blockHtml = b => { let html='', prev=null; const L=b.idx;
@@ -210,15 +210,15 @@ async function loadSession(){
     return `<div class="card ex${gapSet.has(idx)?' gap':''}" data-idx="${idx}">
       <div class="exhead"><h3><span class="lbl">${it.tempo||''}</span>${it.exercise}</h3><b>${schemeOf(it)}</b></div>
       ${it.video_url?`<div class="meta"><a href="${it.video_url}" target="_blank">Video</a></div>`:''}
-      <div class="sugg">${lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
+      <div class="sugg">${!it.sets ? '' : lw ? `Last time: ${lw} lb. Today: <b>${sug} lb</b>${rule.load_pct<100?` (${100-rule.load_pct}% less)`:''}` : 'First time logging this one. Pick a weight you can own.'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
-      ${Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
+      ${!it.sets ? '' : Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="lb" value="${sug||''}" data-w>
         <input type="number" inputmode="numeric" placeholder="reps" value="${parseInt(repsOf(it))||''}" data-r></div>`).join('')}
     </div>`; };
 
   $('exList').innerHTML =
-    `<div id="tabs">${blocks.map((b,i)=>`<button data-b="${i}">${b.nm}</button>`).join('')}</div>` +
+    `<div id="tabs">${blocks.map((b,i)=>`<button data-b="${i}">${b.nm}${/intro/i.test(b.q)?' Intro':''}</button>`).join('')}</div>` +
     blocks.map((b,i)=>`<div class="blk" data-b="${i}">
       <div class="band"><div class="l"><span class="nm">${b.nm}</span><span class="q">${b.q}</span></div><span class="tm">${b.tm ? b.tm+' min' : ''}</span></div>
       ${blockHtml(b)}
