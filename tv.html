@@ -73,6 +73,9 @@ main{margin-top:1.5vh}
 #lifts.many #band,#lifts.many #navrow{grid-column:1/-1}
 #lifts.many .lift{padding:.9vh 1vw}
 #lifts.many .lift .scheme{font-size:3.2vh}
+.lift:has(.n:empty){grid-template-columns:1fr auto}
+#lifts.many{grid-template-rows:auto repeat(6,minmax(0,1fr)) auto;height:100%}
+#lifts.many .lift .ex{white-space:normal;line-height:1.1}
 </style></head>
 <body>
 <header>
@@ -132,8 +135,8 @@ function fitAim(){
 }
 function fitNames(){
   document.querySelectorAll('.lift .ex').forEach(e=>{
-    let f = innerHeight*0.046; e.style.fontSize = f+'px';
-    while (e.scrollWidth > e.clientWidth && f > 14){ f--; e.style.fontSize = f+'px'; }
+    const many = document.getElementById('lifts').classList.contains('many'); let f = innerHeight*(many?0.034:0.046); e.style.fontSize = f+'px';
+    while (!many && e.scrollWidth > e.clientWidth && f > 14){ f--; e.style.fontSize = f+'px'; }
   });
 }
 
