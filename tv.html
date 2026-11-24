@@ -326,11 +326,12 @@ function fitWU(){ const L = document.getElementById('lifts'); if (!L) return;
 <script>
 // REACTIVE INTRO: drills are coach-led (not shown); members go jump on the Hawkin force plates
 function introHtml(list){ const fp = list.find(r => /force\s*plate/i.test(r.exercise));
-  const cue = fp ? titleCase(fp.exercise.replace(/\s+-\s+/g, ', ')).replace(/!+$/, '') : 'Test Your Jump On The Force Plates';
+  const cue = '3 Counter-Movement Jumps, Hands On Hips';
   return '<div class="hkw"><div class="hkt"><img class="hkl" src="https://www.hawkindynamics.com/hs-fs/hubfs/Brand%20Guidelines%202026/Logos/logo_horz-white.png" alt="Hawkin Dynamics"><div class="hkh">Go Jump On The Hawkin Force Plates</div><div class="hkc">' + cue + '</div></div>'
-    + '<img class="hkp" src="force-plate.jpg" alt="Jumping on the Hawkin force plates at EMPWR" onerror="this.style.display=\'none\'"></div>'; }
+    + '<img class="hkp" src="force-plate.jpg" alt="Jumping on the Hawkin force plates at EMPWR" onerror="this.style.display=\'none\'">'
+    + '<img class="hkp" src="force-plate-2.jpg" alt="Jumping on the Hawkin force plates at EMPWR" onerror="this.style.display=\'none\'"></div>'; }
 (function(){ const st = document.createElement('style');
-  st.textContent = '.hkw{display:flex;gap:2vw;align-items:stretch;height:100%;min-height:0}.hkt{flex:1;background:var(--onyx,#12161F);color:#fff;border-radius:1.4vh;padding:4vh 3vw;display:flex;flex-direction:column;justify-content:center;gap:2.4vh}.hkl{height:9vh;width:auto;align-self:flex-start}.hkh{font-family:"Bebas Neue";font-size:9vh;line-height:.95;letter-spacing:.02em}.hkc{font-family:"Bebas Neue";font-size:5vh;color:#EB5345;letter-spacing:.03em}.hkp{flex:1;min-width:0;object-fit:cover;border-radius:1.4vh;max-height:70vh}';
+  st.textContent = '.hkw{display:flex;gap:2vw;align-items:stretch;height:100%;min-height:0}.hkt{flex:1;background:var(--onyx,#12161F);color:#fff;border-radius:1.4vh;padding:4vh 3vw;display:flex;flex-direction:column;justify-content:center;gap:2.4vh}.hkl{height:9vh;width:auto;align-self:flex-start}.hkh{font-family:"Bebas Neue";font-size:9vh;line-height:.95;letter-spacing:.02em}.hkc{font-family:"Bebas Neue";font-size:5vh;color:#EB5345;letter-spacing:.03em}.hkp{flex:0 0 auto;height:100%;width:auto;max-width:28%;aspect-ratio:9/16;object-fit:cover;object-position:center top;border-radius:1.4vh}';
   document.head.appendChild(st); })();
 // LAST TIME page: who checked in on the iPad today + their top set last time on each main lift
 let __lt = null;
