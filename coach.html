@@ -77,6 +77,7 @@ button{font:inherit;cursor:pointer}
 #bar .in{max-width:1000px;margin:auto}
 .res{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
 .ok{color:#2FA84F;font-weight:800}.bad{color:var(--red);font-weight:800}
+.slotSel{font:inherit;color:#fff;background:var(--ink);border:0;border-radius:6px;padding:3px 6px;cursor:pointer;letter-spacing:inherit}
 .slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
 <body>
@@ -118,7 +119,7 @@ button{font:inherit;cursor:pointer}
 <script>
 const sb = supabase.createClient("https://utljgnuieyjdqclfiwqz.supabase.co", "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3", { db: { schema: 'sgpt' } });
 // Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
-const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
+const fmtSlot = s => { if (!s) return ''; if (s === 'open') return 'Open Gym'; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
 function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
 let SLOTS = [];
@@ -126,11 +127,13 @@ async function sessionRows(cols){
   const { data: all } = await sb.from('day_sessions').select('slot');
   SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
   const p = pickedSlot();
+  if (p === 'open') return sb.from('todays_session').select(cols || '*').order('item_order');   // open gym: today's program
   if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
   return sb.from('todays_session').select(cols || '*').order('item_order');
 }
 const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
-const slotBtn = s => SLOTS.length > 1 ? `<button class="slotBtn" title="Tap to switch class">${fmtSlot(s)} ▸</button>` : fmtSlot(s);
+// pick the hour you're logging (today's class times) or Open Gym
+const slotBtn = s => `<select class="slotSel" title="Which class are you logging?">${[...SLOTS, 'open'].map(x => `<option value="${x}"${x === s ? ' selected' : ''}>${fmtSlot(x)}</option>`).join('')}</select>`;
 
 const $ = id => document.getElementById(id);
 const show = id => ['stepPick','stepBoard','stepDone'].forEach(s => $(s).classList.toggle('hidden', s !== id));
@@ -156,12 +159,12 @@ $('startBtn').onclick = load;
 // top line like the TV: logo, phase, aim in cursive (as big as it fits), day / date / week
 // session time: defaults to the session closest to now, tap to switch
 let curSlot = null;
-document.addEventListener('click', async e => { if (!e.target.closest('.slotBtn')) return; const nx = nextSlot(curSlot);
-  if (items.length && !confirm('Switch to the ' + fmtSlot(nx) + ' class? Numbers you have not saved will be cleared.')) return;
+document.addEventListener('change', async e => { const sel = e.target.closest('.slotSel'); if (!sel) return; const nx = sel.value;
+  if (items.length && !confirm('Switch to ' + (nx === 'open' ? 'Open Gym' : 'the ' + fmtSlot(nx) + ' class') + '? Numbers you have not saved will be cleared.')) { sel.value = curSlot; return; }
   pickSlot(nx); const { data } = await sessionRows('title,week,slot'); if (data && data[0]) setHeader(data[0]); if (items.length) load(); });
 function setHeader(r){ const t = (r.title || '').trim(), ph = (t.match(/\[\s*(phase\s*\d+)\s*\]/i) || [])[1] || '';
   $('phase').textContent = ph ? tc(ph.toUpperCase()).replace(/\s+/, ' ') : ''; $('aim').textContent = tc(t.split('--').pop().replace(/\[.*?\]/g, '').trim());
-  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · Week ${r.week} · ${slotBtn(r.slot)}`; curSlot = r.slot;
+  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · Week ${r.week} · ${slotBtn(pickedSlot() === 'open' ? 'open' : r.slot)}`; curSlot = pickedSlot() === 'open' ? 'open' : r.slot;
   const a = $('aim'), box = $('hdrT'); let f = 44; a.style.fontSize = f + 'px'; while (box.scrollWidth > box.clientWidth && f > 18) { f--; a.style.fontSize = f + 'px'; } }
 sessionRows('title,week,slot').then(({ data }) => { if (data && data[0]) setHeader(data[0]); });
 // who's here: everyone who checked in on the iPad today shows up on their own (tap ✕ to drop a no-show)
