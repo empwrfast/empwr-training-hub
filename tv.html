@@ -360,7 +360,7 @@ function lastHtml(){
     __lt.rows.map(r => `<tr><td class="ltn">${r.name}</td>${r.vals.map(v => `<td>${v}</td>`).join('')}</tr>`).join('') + '</table></div>';
 }
 async function loadLast(){ try {
-  const rp = pages.find(p => /^RESISTANCE/i.test(p.nm)); if (!rp) return;
+  const rp = pages.find(p => /^RESISTANCE/i.test(p.nm)); if (!rp) return; const t0 = new Date(); t0.setHours(0, 0, 0, 0);
   const lifts = rp.items.filter(r => r.sets);
   const { data: ex } = await sb.from('exercises').select('id,name').in('name', lifts.map(l => l.exercise));
   const idBy = Object.fromEntries((ex || []).map(e => [e.name, e.id]));
@@ -373,14 +373,22 @@ async function loadLast(){ try {
     const exIds = lifts.map(l => idBy[l.exercise]).filter(Boolean);
     let h = [];
     if (exIds.length) { const r = await sb.from('set_logs').select('member_id,exercise_id,weight,reps,workout_log_id,created_at').in('member_id', ids).in('exercise_id', exIds).order('created_at', { ascending: false }).limit(3000); h = r.data || []; }
-    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
     const best = {}, wl = {};
     h.forEach(r => { if (new Date(r.created_at) >= t0) return; const k = r.member_id + '|' + r.exercise_id;
       if (!(k in wl)) wl[k] = r.workout_log_id; if (wl[k] !== r.workout_log_id) return;
       if (!best[k] || +r.weight > +best[k].weight) best[k] = r; });
-    rows = (ms || []).sort((a, b) => a.first_name.localeCompare(b.first_name)).map(m => ({ name: `${m.first_name} ${(m.last_name || '').slice(0, 1)}.`,
+    rows = (ms || []).sort((a, b) => a.first_name.localeCompare(b.first_name)).map(m => ({ id: m.id, name: `${m.first_name} ${(m.last_name || '').slice(0, 1)}.`,
       vals: lifts.map(l => { const b = best[m.id + '|' + idBy[l.exercise]]; return b ? `${+b.weight} × ${b.reps}` : '<span class="ltnew">New</span>'; }) }));
   }
+  // RESILIENCY (cardio) columns: last distance / cals / time, from their last logged workout
+  const cp = pages.find(p => /^RESILIENCY/i.test(p.nm)), cardio = cp ? cp.items.filter(r => (r.exercise || '').trim()) : [];
+  if (cardio.length) { const cv = {};
+    if (ids.length) { const { data: wls } = await sb.from('workout_logs').select('member_id,notes,created_at').in('member_id', ids).order('created_at', { ascending: false }).limit(1000);
+      (wls || []).forEach(w => { if (new Date(w.created_at) >= t0) return; let x; try { x = JSON.parse(w.notes || '{}'); } catch (e) { return; }
+        ((x && x.cardio) || []).forEach(c => { const k = w.member_id + '|' + (c.exercise || '').trim().toUpperCase(); if (k in cv) return;
+          cv[k] = c.distance ? `${+c.distance} ${c.unit || ''}`.trim() : c.cals ? `${+c.cals} cal` : c.time ? c.time : c.watts ? `${+c.watts} W` : ''; }); }); }
+    lifts.push(...cardio);
+    rows.forEach((r, i) => cardio.forEach(c => { const v = cv[r.id + '|' + (c.exercise || '').trim().toUpperCase()]; r.vals.push(v || '<span class="ltnew">New</span>'); })); }
   __lt = { lifts, rows };
   if (pages[pageIdx] && pages[pageIdx].last) draw();
 } catch (e) { console.log('loadLast', e); } }
