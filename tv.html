@@ -299,11 +299,12 @@ async function loadStats(){
   const today = new Date().toISOString().slice(0,10);
   const { count } = await sb.from('workout_logs').select('id',{count:'exact',head:true}).eq('log_date', today);
   document.getElementById('count').textContent = count || 0;
+  const ini = m => ((m.first_name || '')[0] || '').toUpperCase() + '.' + ((m.last_name || '')[0] || '').toUpperCase() + '.';   // initials only, e.g. R.H.
   const { data } = await sb.from('personal_records')
-    .select('value,pr_type,members(first_name),exercises(name)')
+    .select('value,pr_type,members(first_name,last_name),exercises(name)')
     .eq('achieved_on', today).eq('pr_type','heaviest').limit(6);
   if (data && data.length) document.getElementById('feed').innerHTML =
-    data.map(p=>`🔥 <b>${p.members.first_name}</b>, ${p.exercises.name} ${p.value}`).join('<br>');
+    data.map(p=>`🔥 <b>${ini(p.members)}</b> ${p.exercises.name} ${+p.value}`).join('<br>');
 }
 (async()=>{
   const sid = await loadSession();
