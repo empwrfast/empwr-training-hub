@@ -81,6 +81,7 @@ body{max-width:900px}
 .choose .ex{margin:8px 0}
 .chz{font-family:'Bebas Neue';color:var(--fg);font-size:22px;letter-spacing:.08em}
 .or{font-family:'Mr Dafoe';font-weight:400;color:var(--fg);font-size:32px;text-align:center;line-height:1}
+.slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
 <body>
 <header>
@@ -125,6 +126,21 @@ const SUPABASE_URL = "https://utljgnuieyjdqclfiwqz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3";
 // ================================================================
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'sgpt' } });
+// Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
+const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
+function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
+function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
+let SLOTS = [];
+async function sessionRows(cols){
+  const { data: all } = await sb.from('day_sessions').select('slot');
+  SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
+  const p = pickedSlot();
+  if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
+  return sb.from('todays_session').select(cols || '*').order('item_order');
+}
+const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
+const slotBtn = s => SLOTS.length > 1 ? `<button class="slotBtn" title="Tap to switch class">${fmtSlot(s)} ▸</button>` : fmtSlot(s);
+
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const enteredBy = params.get('mode') || (params.get('log') !== null ? 'member' : 'tablet'); // ?mode=coach on laptops
@@ -201,12 +217,13 @@ $('readyBtn').onclick = async () => {
 };
 
 // STEP 3
+document.addEventListener('click', e => { if (!e.target.closest('.slotBtn') || !items.length) return; pickSlot(nextSlot(items[0].slot)); loadSession(); });
 async function loadSession(){
-  const { data } = await sb.from('todays_session').select('*');
+  const { data } = await sessionRows();
   items = data || [];
   if (!items.length) { $('exList').innerHTML = '<div class="card">No session programmed for today.</div>'; show('stepSession'); return; }
   $('sessTitle').textContent = items[0].title || "Today's Lift";
-  $('sessSub').textContent = `Week ${items[0].week}, ${items[0].day}`;
+  $('sessSub').innerHTML = `Week ${items[0].week}, ${items[0].day} · ${slotBtn(items[0].slot)}`;
   $('badge').textContent = rule.label; $('badge').className = 'badge ' + rule.label;
   $('guidance').textContent = rule.guidance;
 

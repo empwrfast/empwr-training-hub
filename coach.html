@@ -58,6 +58,7 @@ button{font:inherit;cursor:pointer}
 #bar .in{max-width:1000px;margin:auto}
 .res{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
 .ok{color:#2FA84F;font-weight:800}.bad{color:var(--red);font-weight:800}
+.slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
 <body>
 <header>
@@ -95,6 +96,21 @@ button{font:inherit;cursor:pointer}
 
 <script>
 const sb = supabase.createClient("https://utljgnuieyjdqclfiwqz.supabase.co", "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3", { db: { schema: 'sgpt' } });
+// Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
+const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
+function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
+function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
+let SLOTS = [];
+async function sessionRows(cols){
+  const { data: all } = await sb.from('day_sessions').select('slot');
+  SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
+  const p = pickedSlot();
+  if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
+  return sb.from('todays_session').select(cols || '*').order('item_order');
+}
+const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
+const slotBtn = s => SLOTS.length > 1 ? `<button class="slotBtn" title="Tap to switch class">${fmtSlot(s)} ▸</button>` : fmtSlot(s);
+
 const $ = id => document.getElementById(id);
 const show = id => ['stepPick','stepBoard','stepDone'].forEach(s => $(s).classList.toggle('hidden', s !== id));
 const fmt = n => Math.round(n).toLocaleString('en-CA');
@@ -118,14 +134,15 @@ function drawChips(){ $('chips').innerHTML = picked.map(p => `<button class="chi
 $('startBtn').onclick = load;
 // top line like the TV: logo, phase, aim in cursive (as big as it fits), day / date / week
 // session time: defaults to the session closest to now, tap to switch
-const SESS = [['7:00 AM', 420], ['8:00 AM', 480], ['11:30 AM', 690], ['12:30 PM', 750], ['5:00 PM', 1020], ['6:00 PM', 1080]];
-let sessIdx = (() => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); let k = 0; SESS.forEach((x, i) => { if (m >= x[1] - 15) k = i; }); return k; })();
-document.addEventListener('click', e => { if (e.target.id !== 'sess') return; sessIdx = (sessIdx + 1) % SESS.length; e.target.textContent = SESS[sessIdx][0]; });
+let curSlot = null;
+document.addEventListener('click', async e => { if (!e.target.closest('.slotBtn')) return; const nx = nextSlot(curSlot);
+  if (items.length && !confirm('Switch to the ' + fmtSlot(nx) + ' class? Numbers you have not saved will be cleared.')) return;
+  pickSlot(nx); const { data } = await sessionRows('title,week,slot'); if (data && data[0]) setHeader(data[0]); if (items.length) load(); });
 function setHeader(r){ const t = (r.title || '').trim(), ph = (t.match(/\[\s*(phase\s*\d+)\s*\]/i) || [])[1] || '';
   $('phase').textContent = ph ? tc(ph.toUpperCase()).replace(/\s+/, ' ') : ''; $('aim').textContent = tc(t.split('--').pop().replace(/\[.*?\]/g, '').trim());
-  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · Week ${r.week} · <button id="sess" title="Tap to change session">${SESS[sessIdx][0]}</button>`;
+  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · Week ${r.week} · ${slotBtn(r.slot)}`; curSlot = r.slot;
   const a = $('aim'), box = $('hdrT'); let f = 44; a.style.fontSize = f + 'px'; while (box.scrollWidth > box.clientWidth && f > 18) { f--; a.style.fontSize = f + 'px'; } }
-sb.from('todays_session').select('title,week').limit(1).then(({ data }) => { if (data && data[0]) setHeader(data[0]); });
+sessionRows('title,week,slot').then(({ data }) => { if (data && data[0]) setHeader(data[0]); });
 // who's here: everyone who checked in on the iPad today shows up on their own (tap ✕ to drop a no-show)
 (async () => { const d = new Date(), days = [d.toLocaleDateString('en-CA'), d.toISOString().slice(0, 10)];
   const { data: ck } = await sb.from('readiness_checkins').select('member_id').in('checkin_date', days);
@@ -174,7 +191,8 @@ const isLift = it => it.sets && !/^(RELEASE|REACTIVE|RUN|RESILIENCY)/i.test((it.
 
 async function load(){
   $('startBtn').disabled = true; $('startBtn').textContent = 'Loading...';
-  const { data } = await sb.from('todays_session').select('*').order('item_order');
+  const { data } = await sessionRows();
+  if (data && data[0]) setHeader(data[0]);
   items = data || [];
   if (!items.length) { $('board').innerHTML = '<div class="card">No session programmed for today.</div>'; show('stepBoard'); return; }
   // blank sets/reps = same as the exercise before it in the block
@@ -251,7 +269,7 @@ $('saveAll').onclick = async () => {
   const out = [];
   for (const p of todo) {
     const { data: wl, error } = await sb.from('workout_logs').insert({ member_id: p.id, session_id: items[0].session_id,
-      entered_by: 'coach', notes: JSON.stringify({ source: 'coach board', session_time: SESS[sessIdx][0], cardio: per[p.id].cardio }) }).select().single();
+      entered_by: 'coach', notes: JSON.stringify({ source: 'coach board', session_time: fmtSlot(curSlot), cardio: per[p.id].cardio }) }).select().single();
     if (error) { out.push(`<div class="res"><span>${p.name}</span><span class="bad">Not saved, try again</span></div>`); continue; }
     const { error: e2 } = per[p.id].sets.length ? await sb.from('set_logs').insert(per[p.id].sets.map(s => ({ ...s, workout_log_id: wl.id, member_id: p.id }))) : { error: null };
     out.push(`<div class="res"><span>${p.name}</span><span class="${e2 ? 'bad' : 'ok'}">${e2 ? 'Sets not saved' : `✓ ${fmt(per[p.id].lb)} lb moved${per[p.id].cardio.length ? ' + cardio' : ''}`}</span></div>`);

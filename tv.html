@@ -126,6 +126,7 @@ aside{gap:1.4vh}
 .wusec{gap:calc(.8vh*var(--k,1))}
 .coachnote{font-size:calc(2.6vh*var(--k,1))}
 .lift .note{white-space:normal;line-height:1.25;font-size:2.4vh}
+.slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
 <body>
 <header>
@@ -153,6 +154,21 @@ const SUPABASE_ANON_KEY = "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3";
 const APP_URL = "https://empwrfast.github.io/empwr-training-hub/log.html";
 // ================================================================
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'sgpt' } });
+// Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
+const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
+function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
+function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
+let SLOTS = [];
+async function sessionRows(cols){
+  const { data: all } = await sb.from('day_sessions').select('slot');
+  SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
+  const p = pickedSlot();
+  if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
+  return sb.from('todays_session').select(cols || '*').order('item_order');
+}
+const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
+const slotBtn = s => SLOTS.length > 1 ? `<button class="slotBtn" title="Tap to switch class">${fmtSlot(s)} ▸</button>` : fmtSlot(s);
+
 const t = document.getElementById('toggle');
 t.onclick = () => { document.body.classList.toggle('dark');
   t.textContent = document.body.classList.contains('dark') ? '🌙' : '☀️'; };
@@ -163,7 +179,7 @@ const pad = n => String(n).padStart(2,'0');
 const titleCase = s => s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s|&)(\w)/g,(m,a,b)=>a+b.toUpperCase()) : s;
 const scheme = r => { const reps = String(r.reps||'').split('|').pop().trim();
   return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} set${r.sets>1?'s':''}`) : reps; };
-let pages = [], pageIdx = 0, sessionId = null;
+let pages = [], pageIdx = 0, sessionId = null, curSlot = null;
 
 function setHeader(s){
   const t = (s.title||'').trim();
@@ -174,7 +190,7 @@ function setHeader(s){
   const d = new Date();
   const dayName = d.toLocaleDateString('en-CA',{weekday:'long'});
   const md = d.toLocaleDateString('en-CA',{month:'short',day:'numeric'}).replace(/\./g,'');
-  document.getElementById('dt').textContent = `${dayName} · ${md} · Week ${s.week}`;
+  document.getElementById('dt').innerHTML = `${dayName} · ${md} · Week ${s.week} · ${slotBtn(s.slot)}`;
   fitAim();
 }
 function fitAim(){
@@ -245,7 +261,9 @@ function draw(){
   fitNames();
 }
 function go(dir){ if(!pages.length) return; pageIdx = (pageIdx + dir + pages.length) % pages.length; draw(); }
+document.addEventListener('click', e=>{ if (!e.target.closest('.slotBtn')) return; pickSlot(nextSlot(curSlot)); pageIdx = 0; loadSession(); });
 document.addEventListener('keydown', e=>{
+  if (e.key==='s' || e.key==='S'){ pickSlot(nextSlot(curSlot)); pageIdx = 0; loadSession(); return; }
   if (e.key==='ArrowRight' || e.key===' ') go(1);
   if (e.key==='ArrowLeft') go(-1);
 });
@@ -253,9 +271,9 @@ addEventListener('resize', ()=>{ fitAim(); fitNames(); });
 setInterval(()=>{ const d=new Date(); document.getElementById('tclk').textContent = `${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }, 1000);
 
 async function loadSession(){
-  const { data, error } = await sb.from('todays_session').select('*');
+  const { data, error } = await sessionRows();
   if (error || !data || !data.length){ pages = []; draw(); return null; }
-  setHeader(data[0]);
+  setHeader(data[0]); if (data[0].slot !== curSlot) pageIdx = 0; curSlot = data[0].slot;
   pages = []; let cur = null;
   data.forEach(r=>{
     const raw = (r.intensity||'').replace(/\s+/g,' ').trim();
