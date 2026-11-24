@@ -20,6 +20,13 @@ h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em}
 input,select{font:inherit;width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 button.main{font-family:'Bebas Neue';font-size:24px;letter-spacing:.05em;width:100%;padding:12px;border:0;border-radius:10px;background:var(--red);color:#fff;cursor:pointer;margin-top:10px}
 .hidden{display:none}
+.pg h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;margin:0 0 8px}
+.pgk{display:flex;gap:10px}.pgk div{flex:1;background:var(--ink);color:#fff;border-radius:10px;padding:10px;text-align:center}.pgk b{display:block;font-family:'Bebas Neue';font-size:30px;line-height:1}.pgk span{font-size:12px;font-weight:700}
+.wk{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.wk span{flex:0 0 74px;font-weight:700}.wk i{display:block;height:16px;border-radius:4px;background:var(--red)}.wk b{flex:0 0 auto;font-weight:800}
+.lift{border-top:1px solid var(--line);padding:10px 0}.lift:first-of-type{border-top:0}.lift .nm{font-weight:800}.lift .up{color:#2FA84F;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips span{background:var(--card,#F3F4F6);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:13px}.chips em{font-style:normal;color:var(--mute,#8a8f98);font-size:11px;display:block}
+.prr{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding:8px 0;font-size:14px}.prr:first-of-type{border-top:0}
+button.sec{background:var(--ink)}
 .scale{display:flex;gap:6px;margin:6px 0 12px}
 .ds{display:flex;gap:6px;font-family:inherit}.ds button{font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;padding:6px 14px;border-radius:8px;border:2px solid #fff;background:transparent;color:#fff;cursor:pointer}
 .ds button[data-s=done].on{background:#2FA84F;border-color:#2FA84F}.ds button[data-s=skip].on{background:#8a8f98;border-color:#8a8f98}
@@ -112,6 +119,14 @@ body{max-width:900px}
   <h1 id="hello">Hey</h1><h2>How Are You Feeling?</h2>
   <div class="card" id="scales"></div>
   <button class="main" id="readyBtn">Show My Session</button>
+  <button class="main sec" onclick="showProgress('stepReady')">See My Progress</button>
+</section>
+
+<!-- MY PROGRESS (current members only: the name search only finds active members) -->
+<section id="stepProg" class="hidden pg">
+  <h1 id="progT">My Progress</h1><h2>Your Weights, Weeks And PRs</h2>
+  <div id="prog"></div>
+  <button class="main" id="progBack">Back</button>
 </section>
 
 <!-- STEP 3: SESSION -->
@@ -221,7 +236,7 @@ document.addEventListener('click',e=>{ const b=e.target.closest('.addset'); if(!
   b.parentElement.querySelector('[data-vol]').before(c); updVol(); });
 document.addEventListener('click',e=>{ const b=e.target.closest('.addwu'); if(!b) return; const box=b.previousElementSibling, n=box.children.length+1;
   box.insertAdjacentHTML('beforeend',`<div class="wset"><span>W${n}</span><input type="number" inputmode="decimal" placeholder="lb" data-w><input type="number" inputmode="numeric" placeholder="reps" data-r></div>`); });
-const show = id => ['stepWho','stepReady','stepSession'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
+const show = id => ['stepWho','stepReady','stepSession','stepProg'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
 const round5 = w => Math.round(w/5)*5;
 
 // STEP 1
@@ -232,6 +247,42 @@ let t; $('search').oninput = e => { clearTimeout(t); t = setTimeout(async()=>{
   $('results').innerHTML = (data||[]).map(m=>`<button class="main" style="background:var(--onyx)" data-id="${m.id}" data-n="${m.first_name}">${m.first_name} ${m.last_name}</button>`).join('');
   $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>{ member={id:b.dataset.id,first:b.dataset.n}; startReady(); });
 },250); };
+
+// MY PROGRESS: every week they've logged, top set per lift week by week, weekly volume, PRs
+const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+const wkLbl = d => d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '');
+const wtx = w => +w ? `${+w}` : 'BW';
+async function showProgress(back){
+  $('progBack').onclick = () => { show(back); scrollTo(0, 0); };
+  $('progT').textContent = `${member.first}'s Progress`; $('prog').innerHTML = '<div class="card">Loading...</div>'; show('stepProg'); scrollTo(0, 0);
+  const [{ data: sl }, { data: prs }] = await Promise.all([
+    sb.from('set_logs').select('exercise_id,weight,reps,created_at,workout_log_id').eq('member_id', member.id).order('created_at').limit(5000),
+    sb.from('personal_records').select('exercise_id,pr_type,value,achieved_on').eq('member_id', member.id).order('achieved_on', { ascending: false }).limit(200)]);
+  const sets = sl || [], P = prs || [];
+  if (!sets.length && !P.length) { $('prog').innerHTML = '<div class="card">Nothing logged yet. Log today\'s session and your progress starts here.</div>'; return; }
+  const ids = [...new Set([...sets.map(x => x.exercise_id), ...P.map(x => x.exercise_id)])].filter(Boolean);
+  const { data: ex } = ids.length ? await sb.from('exercises').select('id,name').in('id', ids) : { data: [] };
+  const nm = Object.fromEntries((ex || []).map(e => [e.id, e.name]));
+  // weeks
+  const W = {}; sets.forEach(x => { const k = monday(x.created_at).getTime(); (W[k] ||= []).push(x); });
+  const weeks = Object.keys(W).map(Number).sort((a, b) => a - b), lastW = weeks.slice(-8);
+  const vol = k => W[k].reduce((a, x) => a + (+x.weight || 0) * (+x.reps || 0), 0), maxV = Math.max(1, ...lastW.map(vol));
+  const total = sets.reduce((a, x) => a + (+x.weight || 0) * (+x.reps || 0), 0), sess = new Set(sets.map(x => x.workout_log_id)).size;
+  // lifts: top set each week
+  const byEx = {}; sets.forEach(x => { const k = monday(x.created_at).getTime(), o = ((byEx[x.exercise_id] ||= {})[k] ||= { w: -1, r: 0 });
+    if (+x.weight > o.w || (+x.weight === o.w && +x.reps > o.r)) { o.w = +x.weight; o.r = +x.reps; } });
+  const lastSeen = id => Math.max(...Object.keys(byEx[id]).map(Number));
+  const lifts = Object.keys(byEx).sort((a, b) => lastSeen(b) - lastSeen(a)).map(id => { const ks = Object.keys(byEx[id]).map(Number).sort((a, b) => a - b), f = byEx[id][ks[0]], l = byEx[id][ks[ks.length - 1]];
+    const up = l.w - f.w;
+    return `<div class="lift"><div class="nm">${nm[id] || 'Exercise'}${ks.length > 1 && up > 0 ? ` <span class="up">+${up} lb</span>` : ''}</div>
+      <div class="chips">${ks.slice(-6).map(k => `<span><em>Wk Of ${wkLbl(new Date(k))}</em>${wtx(byEx[id][k].w)} × ${byEx[id][k].r}</span>`).join('')}</div></div>`; }).join('');
+  const label = { heaviest: 'Heaviest', est_5rm: 'Est. 5RM', session_volume: 'Best Volume' };
+  $('prog').innerHTML = `
+    <div class="card pgk"><div><b>${sess}</b><span>Sessions Logged</span></div><div><b>${weeks.length}</b><span>Weeks Training</span></div><div><b>${fmt(total)}</b><span>Total lb Moved</span></div></div>
+    ${lastW.length ? `<div class="card"><h3>Pounds Moved Per Week</h3>${lastW.map(k => `<div class="wk"><span>${wkLbl(new Date(k))}</span><i style="width:${Math.max(3, vol(k) / maxV * 100) * .62}%"></i><b>${fmt(vol(k))}</b></div>`).join('')}</div>` : ''}
+    ${P.length ? `<div class="card"><h3>🔥 Your PRs</h3>${P.slice(0, 15).map(p => `<div class="prr"><span><b>${nm[p.exercise_id] || 'Exercise'}</b><br>${label[p.pr_type] || p.pr_type}</span><span style="text-align:right"><b>${+p.value}</b><br>${new Date(p.achieved_on + 'T12:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')}</span></div>`).join('')}</div>` : ''}
+    ${lifts ? `<div class="card"><h3>Your Lifts, Week By Week</h3><div style="font-size:12px;color:var(--mute,#8a8f98);margin-bottom:4px">Top set each week. Most recent lifts first.</div>${lifts}</div>` : ''}`;
+}
 
 // STEP 2
 const Q = [['sleep','Sleep'],['energy','Energy'],['soreness','Soreness'],['stress','Stress']];
@@ -429,7 +480,7 @@ $('saveBtn').onclick = async () => {
   $('saved').innerHTML = `<h3>Saved. Nice Work, ${member.first}.</h3>` +
     (vs.total ? `<div class="sumbox"><div class="sumh">Your Lift Summary</div>${vs.rows.map(r=>`<div class="sumr"><span>${r.name}</span><b>${fmt(r.lb)} lb</b></div>`).join('')}<div class="sumr tot"><span>Total Moved Today</span><b>${fmt(vs.total)} lb</b></div></div>` : '') +
     (newPr && newPr.length ? newPr.map(p=>`<div class="pr">🔥 New ${label[p.pr_type]} PR: ${p.exercises.name} ${p.value}</div>`).join('') : '<div>Logged. See you next session.</div>') +
-    `<button class="main" onclick="location.reload()">Next Person</button>`;
+    `<button class="main sec" onclick="showProgress('stepSession')">See My Progress</button><button class="main" onclick="location.reload()">Next Person</button>`;
   $('saved').classList.remove('hidden'); $('saveBtn').classList.add('hidden');
 };
 </script></body></html>
