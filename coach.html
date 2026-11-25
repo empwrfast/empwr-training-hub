@@ -180,10 +180,12 @@ let blocks = [];
 // "A / B" in the name = they pick one. Over/under (mixed) grip = reps for each side.
 // Chin-ups: weight is added lb, leave it blank for bodyweight (reps are not prefilled so nothing saves by accident)
 const SIDE_RX = /\s*(SAME REPS ON EACH SIDE|EACH SIDE)\s*/ig, MIXED = /\bOVR\b|\bOVER\b|\bUNDER\b|MIXED/i, CHIN = /CHIN|PULL\s*-?\s*UP|\bOVR\s*UNDER/i;
+// keep gym shorthand in caps (DB, KB, RDL...) and capitalize words in brackets
+const fixAb = x => x.replace(/\b(db|kb|bb|ssb|rdl|mb|sl|sa|trx)\b/gi, m => m.toUpperCase()).replace(/\((\w)/g, (m, c) => '(' + c.toUpperCase());
 function optsOf(it){ const raw = String((it && it.exercise) || ''); if (!/\s\/\s/.test(raw)) return null; const each = /EACH SIDE/i.test(raw);
   return raw.split(/\s+\/\s+/).map(q => { const n = q.replace(SIDE_RX, ' ').trim(), chin = CHIN.test(n) || MIXED.test(n);
     const e = LIB.find(x => x.name.trim().toUpperCase() === n.toUpperCase());
-    return { name: n, label: chin && !/CHIN|PULL/i.test(n) ? 'Chin-Up ' + tc(n.replace(/\bOVR\b/i, 'OVER')) : tc(n), id: e ? e.id : null, sides: each && MIXED.test(n), bw: chin }; }); }
+    return { name: n, label: fixAb(chin && !/CHIN|PULL/i.test(n) ? 'Chin-Up ' + tc(n.replace(/\bOVR\b/i, 'OVER')) : tc(n)), id: e ? e.id : null, sides: each && MIXED.test(n), bw: chin }; }); }
 const modeOf = (it, oi) => { const o = optsOf(it); if (o) return o[oi || 0] || o[0]; const x = String((it && it.exercise) || '');
   return { sides: /EACH SIDE/i.test(x) && MIXED.test(x), bw: CHIN.test(x) }; };
 const exIdOf = (it, oi) => { const o = optsOf(it); return (o && (o[oi || 0] || {}).id) || it.exercise_id; };
