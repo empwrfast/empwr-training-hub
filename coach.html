@@ -80,6 +80,9 @@ button{font:inherit;cursor:pointer}
 .st.saved{border-color:#2FA84F;box-shadow:inset 3px 0 0 #2FA84F}#resume{border:2px solid var(--red)}#autos{font-size:12px;color:var(--mute);text-align:center;margin-top:6px}
 #bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px}
 #bar .in{max-width:1000px;margin:auto}
+.crow .cnote{grid-column:1/-1}
+#bnav{display:flex;gap:8px}#bnav .nav{flex:1;font-family:'Bebas Neue';font-size:22px;letter-spacing:.05em;padding:10px;border-radius:10px;border:2px solid var(--ink);background:#fff;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bnav .nav.nx{background:var(--ink);color:#fff}#bnav .nav[hidden]{display:block!important;visibility:hidden}#bar #saveAll{margin-top:8px!important}
 .res{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
 .ok{color:#2FA84F;font-weight:800}.bad{color:var(--red);font-weight:800}
 .weekSel{font:inherit;color:#fff;background:var(--ink);border-radius:6px;padding:3px 6px;border:0;cursor:pointer;letter-spacing:inherit}
@@ -111,7 +114,7 @@ button{font:inherit;cursor:pointer}
   <h2 id="sub"></h2>
   <div class="card" style="padding:10px 14px"><input id="late" placeholder="+ Add A Name (late arrival)" autocomplete="off"><div id="lateRes"></div><div id="onChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"></div><div style="font-size:13px;color:var(--mute);margin-top:6px">Tap a name to remove them from this session.</div></div>
   <div id="board"></div>
-  <div id="bar"><div class="in"><button class="main" id="saveAll" style="margin:0">Save All</button><div id="autos"></div></div></div>
+  <div id="bar"><div class="in"><div id="bnav"><button class="nav" id="prevB"></button><button class="nav nx" id="nextB"></button></div><button class="main hidden" id="saveAll" style="margin:0">Session Done: Save All</button><div id="autos"></div></div></div>
 </section>
 
 <!-- STEP 3: done -->
@@ -280,12 +283,15 @@ const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `$
 const isCardio = it => /^RESILIENCY/i.test((it.intensity || '').trim()) && !!(it.exercise || '').trim();
 // default distance unit per machine at EMPWR
 const unitFor = n => /versa/i.test(n) ? 'ft' : /true\s*form/i.test(n) ? 'km' : /woodway|4\s*front/i.test(n) ? 'mi' : /echo|bike/i.test(n) ? 'mi' : /ski|row/i.test(n) ? 'm' : /treadmill/i.test(n) ? 'km' : 'm';
-function cardioRow(p, it){ const n = it.exercise, u = unitFor(n), f = (k, ph, lab) => `<label class="cf">${lab}<input type="${k === 'time' ? 'text' : 'number'}" inputmode="${k === 'time' ? 'numeric' : 'decimal'}" placeholder="${ph}" data-c="${k}"></label>`;
+// cardio machines at EMPWR: coach can switch someone to another machine (fields + units follow the machine)
+const MACHINES = [['Versa Climber', /versa/i], ['Echo Bike', /echo|bike/i], ['Ski Erg', /ski/i], ['Rower', /\brow/i], ['True Form Runner', /true\s*form/i], ['Woodway 4Front', /woodway|4\s*front/i], ['Treadmill', /treadmill/i]];
+const machOf = n => (MACHINES.find(([, rx]) => rx.test(n || '')) || [''])[0];
+function cardioRow(p, it, mach){ mach = mach || machOf(it.exercise); const n = mach || it.exercise, u = unitFor(n), f = (k, ph, lab) => `<label class="cf">${lab}<input type="${k === 'time' ? 'text' : 'number'}" inputmode="${k === 'time' ? 'numeric' : 'decimal'}" placeholder="${ph}" data-c="${k}"></label>`;
   const tm = /treadmill|woodway|4\s*front|true\s*form/i.test(n), incl = /treadmill|woodway|4\s*front/i.test(n), bike = /echo|bike/i.test(n), spd = u === 'mi' ? 'mph' : 'km/h';
   const extra = tm ? f('speed', spd, 'Speed') + (incl ? f('incline', '%', 'Incline') : f('cals', 'cal', 'Cals'))
     : bike ? f('watts', 'W', 'Avg W') + f('max_watts', 'W', 'Max W') + f('cadence', 'rpm', 'RPM') + f('cals', 'cal', 'Cals') : f('watts', 'W', 'Avg W') + f('cals', 'cal', 'Cals');
   return `<div class="mrow crow" data-m="${p.id}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.</div>
-    <div class="cgrid">${f('time', 'min:sec', 'Time')}<label class="cf">Distance<span style="display:flex;gap:4px"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x => `<option${x === u ? ' selected' : ''}>${x}</option>`).join('')}</select></span></label>${extra}</div>${noteBox()}</div>`; }
+    <div class="cgrid"><label class="cf">Machine<select data-c="machine">${[...(machOf(it.exercise) ? [] : [['', 'As Programmed']]), ...MACHINES.map(([m]) => [m, m])].map(([v, l]) => `<option value="${v}"${v === mach ? ' selected' : ''}>${l}${v && v === machOf(it.exercise) ? ' (Programmed)' : ''}</option>`).join('')}</select></label>${f('time', 'min:sec', 'Time')}<label class="cf">Distance<span style="display:flex;gap:4px"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x => `<option${x === u ? ' selected' : ''}>${x}</option>`).join('')}</select></span></label>${extra}</div>${noteBox()}</div>`; }
 const isLift = it => it.sets && !/^(RELEASE|REACTIVE|RUN|RESILIENCY)/i.test((it.intensity || '').trim()) && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo || '');
 
 async function load(){
@@ -340,7 +346,12 @@ async function load(){
   $('board').innerHTML = `<div id="tabs">${blocks.map((b, i) => `<button data-b="${i}">${b.nm}</button>`).join('')}</div>` +
     blocks.map((b, i) => `<div class="blk" data-b="${i}"><div class="band"><div><span class="nm">${b.nm}</span><span class="q">${b.q}</span></div></div>${blockHtml(b)}</div>`).join('');
   const showBlock = i => { document.querySelectorAll('.blk').forEach(el => el.classList.toggle('hidden', +el.dataset.b !== i));
-    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.b === i)); scrollTo(0, 0); };
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.b === i)); scrollTo(0, 0);
+    // bottom bar: previous / next section; Save All shows on the last section (numbers autosave on this device as you go)
+    const pv = blocks[i - 1], nx = blocks[i + 1];
+    $('prevB').hidden = !pv; $('prevB').textContent = pv ? '‹ ' + pv.nm : ''; $('prevB').onclick = () => pv && showBlock(i - 1);
+    $('nextB').hidden = !nx; $('nextB').textContent = nx ? nx.nm + ' ›' : ''; $('nextB').onclick = () => nx && showBlock(i + 1);
+    $('bnav').classList.toggle('hidden', !pv && !nx); $('saveAll').classList.toggle('hidden', !!nx); };
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showBlock(+b.dataset.b));
   showBlock(0); show('stepBoard'); totals();
 }
@@ -364,11 +375,17 @@ $('board').addEventListener('click', e => { const b = e.target.closest('.fillr')
 $('board').addEventListener('click', e => { const b = e.target.closest('.fille'); if (!b) return; const rows = [...b.closest('.ex').querySelectorAll('.mrow')];
   if (rows[0] && rows[0].classList.contains('crow')) { const src = rows.find(r => [...r.querySelectorAll('input[data-c]')].some(i => i.value));
     if (!src) { alert('Type the numbers for one person first, then tap Apply To Everyone.'); return; }
-    rows.forEach(r => { if (r !== src) r.querySelectorAll('[data-c]').forEach(f => { const a = src.querySelector(`[data-c="${f.dataset.c}"]`); if (a && a.value && (f.tagName === 'SELECT' || !f.value)) f.value = a.value; }); }); return; }
+    rows.forEach(r => { if (r !== src) r.querySelectorAll('[data-c]').forEach(f => { const a = src.querySelector(`[data-c="${f.dataset.c}"]`); if (f.dataset.c !== 'machine' && a && a.value && (f.tagName === 'SELECT' || !f.value)) f.value = a.value; }); }); return; }
   const src = rows.find(r => [...r.querySelectorAll('[data-w]')].some(i => i.value)); if (!src) { alert('Type the numbers for one person first, then tap Apply To Everyone.'); return; }
   const sst = src.querySelectorAll('.st');
   rows.forEach(r => { if (r === src || r.dataset.o !== src.dataset.o || !!r._mod !== !!src._mod) return;
     r.querySelectorAll('.st').forEach((x, i) => fillSt(sst[i] || sst[sst.length - 1], x)); }); totals(); });
+// cardio: switching machine rebuilds that person's fields (keeps time + note)
+$('board').addEventListener('change', e => { const sel = e.target.closest('.crow select[data-c="machine"]'); if (!sel) return; const row = sel.closest('.crow');
+  const it = items[+row.closest('.ex').dataset.idx], p = picked.find(x => x.id === row.dataset.m); if (!p) return;
+  const tm = (row.querySelector('[data-c="time"]') || {}).value, nt = (row.querySelector('[data-cn]') || {}).value;
+  const t = document.createElement('div'); t.innerHTML = cardioRow(p, it, sel.value); const nr = t.firstElementChild;
+  if (tm) nr.querySelector('[data-c="time"]').value = tm; if (nt) nr.querySelector('[data-cn]').value = nt; row.replaceWith(nr); });
 // warm-up sets: add / remove
 $('board').addEventListener('click', e => { const b = e.target.closest('.addwu'); if (b) { addWu(b.closest('.mrow')); const w = b.closest('.mrow').querySelectorAll('.wst [data-ww]'); w[w.length - 1].focus(); return; }
   const x = e.target.closest('.xw'); if (!x) return; const box = x.closest('.wus'); x.closest('.wst').remove(); box.querySelectorAll('.wst span').forEach((s, i) => s.textContent = 'WU ' + (i + 1)); });
@@ -471,8 +488,9 @@ $('saveAll').onclick = async () => {
   // only sets with a weight typed in (or dropped in) get saved
   const per = {}; picked.forEach(p => per[p.id] = { sets: [], lb: 0, cardio: [] });
   document.querySelectorAll('.crow').forEach(row => { const it = items[+row.closest('.ex').dataset.idx], o = { exercise_id: it.exercise_id, exercise: it.exercise };
-    row.querySelectorAll('[data-c]').forEach(f => { if (f.value && f.dataset.c !== 'unit') o[f.dataset.c] = f.dataset.c === 'time' ? f.value : parseFloat(f.value); });
-    if (Object.keys(o).length > 2) { o.unit = row.querySelector('[data-c=unit]').value; per[row.dataset.m].cardio.push(o); } });
+    row.querySelectorAll('[data-c]').forEach(f => { if (f.value && f.dataset.c !== 'unit' && f.dataset.c !== 'machine') o[f.dataset.c] = f.dataset.c === 'time' ? f.value : parseFloat(f.value); });
+    if (Object.keys(o).length > 2) { o.unit = row.querySelector('[data-c=unit]').value; const mc = (row.querySelector('[data-c=machine]') || {}).value;
+      if (mc) { o.machine = mc; if (mc !== machOf(it.exercise)) o.switched_from = machOf(it.exercise) || it.exercise; } per[row.dataset.m].cardio.push(o); } });
   document.querySelectorAll('.ex').forEach(card => { const it = items[+card.dataset.idx];
     card.querySelectorAll('.mrow').forEach(row => { const md = row._mod, P = per[row.dataset.m];
       const oi = +row.dataset.o || 0, opt = (optsOf(it) || [])[oi], mx = md && md.alt ? {} : modeOf(it, oi);
@@ -555,7 +573,9 @@ async function applyDraft(d){ restoring = true; WL = d.wl || {};
       if (sid) { x.dataset.sid = sid; x.dataset.sv = sv; x.classList.add('saved'); } });
     if (v.cn) row.querySelector('[data-cn]').value = v.cn;
     (v.wu || []).forEach(([w, r]) => addWu(row, w, r)); }
-  for (const [k, v] of Object.entries(d.crows || {})) { const [idx, mid] = k.split('|'), r = document.querySelector(`.ex[data-idx="${idx}"] .crow[data-m="${mid}"]`); if (!r) continue;
+  for (const [k, v] of Object.entries(d.crows || {})) { const [idx, mid] = k.split('|'); let r = document.querySelector(`.ex[data-idx="${idx}"] .crow[data-m="${mid}"]`); if (!r) continue;
+    if (v.machine && v.machine !== (r.querySelector('[data-c="machine"]') || {}).value) { const p = picked.find(x => x.id === mid), t = document.createElement('div');
+      if (p) { t.innerHTML = cardioRow(p, items[+idx], v.machine); const nr = t.firstElementChild; r.replaceWith(nr); r = nr; } }
     if (v.cn) r.querySelector('[data-cn]').value = v.cn;
     r.querySelectorAll('[data-c]').forEach(f => { if (v[f.dataset.c] != null && v[f.dataset.c] !== '') f.value = v[f.dataset.c]; }); }
   restoring = false; totals(); }
