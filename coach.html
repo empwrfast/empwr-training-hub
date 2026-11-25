@@ -145,20 +145,31 @@ let WEEKS = [], baseWeek = null;
 const todayKey = () => new Date().toLocaleDateString('en-CA');
 function pickedWeek(){ try { const v = JSON.parse(localStorage.getItem('empwrWeek') || 'null'); if (v && v.day === todayKey()) return v.week; } catch (e) {} return null; }
 function pickWeek(w){ try { localStorage.setItem('empwrWeek', JSON.stringify({ week: w, day: todayKey() })); } catch (e) {} }
-async function sessionRows(cols){ const res = await baseRows(); const rows = res.data || [];
+async function sessionRows(cols){ const res = await baseRows(); let rows = res.data || [];
   if (!rows.length) return res; baseWeek = rows[0].week;
   try {
     const { data: cur } = await sb.from('program_sessions').select('id,block_id,day,slot,week').eq('id', rows[0].session_id).single();
     if (!cur) return res;
     const { data: sib } = await sb.from('program_sessions').select('id,week,title,day,slot').eq('block_id', cur.block_id).eq('day', cur.day).eq('slot', cur.slot).order('week');
     WEEKS = [...new Set((sib || []).map(s => s.week))];
-    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w); if (!tgt) return res;
-    const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order');
-    const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
-    const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
-    const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
-    return { data: (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
-      exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })) };
+    const toRows = async (pi, tgt) => { const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
+      const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
+      const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
+      return (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
+        exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })); };
+    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w);
+    if (tgt) { const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order'); rows = await toRows(pi, tgt); }
+    // Resiliency "choose #1-6": the sheet puts option 1 on the Wk 2 row, option 2 on Wk 3, etc., so the sync spreads them across weeks.
+    // Pull every numbered option for this class from all weeks of the block and show them all, every week.
+    const { data: rp } = await sb.from('program_items').select('*').in('session_id', (sib || []).map(s => s.id)).ilike('intensity', 'RESILIENCY%').order('item_order');
+    const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
+    if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
+      opts.sort((a, b) => (parseInt(a.tempo) || 99) - (parseInt(b.tempo) || 99));
+      const isR = r => /^RESILIENCY/i.test((r.intensity || '').trim()) && !!r.exercise, at = rows.findIndex(isR), inten = at >= 0 ? rows[at].intensity : null;
+      const all = (await toRows(opts.map(o => ({ ...o, sets: o.sets || 1 })), me)).map(r => ({ ...r, intensity: inten || r.intensity }));
+      const kept = rows.filter(r => !isR(r)), pos = at < 0 ? kept.length : at;
+      rows = [...kept.slice(0, pos), ...all, ...kept.slice(pos)]; }
+    return { data: rows };
   } catch (e) { return res; } }
 const weekSel = w => WEEKS.length > 1 ? `<select class="weekSel" title="Which week of the program?">${WEEKS.map(x => `<option value="${x}"${x === w ? ' selected' : ''}>Week ${x}</option>`).join('')}</select>` : `Week ${w}`;
 const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
@@ -288,12 +299,15 @@ const MACHINES = [['Versa Climber', /versa/i], ['Echo Bike', /echo|bike/i], ['Sk
 // the task without the machine name: "ROWING MACHINE • 2 min max dist" -> "2 min max dist"
 const cardioTask = n => { n = String(n || ''); return (n.includes('•') ? n.split('•').slice(1).join('•') : n.replace(/^(echo bike|rowing machine|rower|versa climber|ski erg|run|bike)\s*/i, '')).trim(); };
 const machOf = n => (MACHINES.find(([, rx]) => rx.test(n || '')) || [''])[0];
-function cardioRow(p, it, mach){ mach = mach || machOf(it.exercise); const n = mach || it.exercise, u = unitFor(n), f = (k, ph, lab) => `<label class="cf">${lab}<input type="${k === 'time' ? 'text' : 'number'}" inputmode="${k === 'time' ? 'numeric' : 'decimal'}" placeholder="${ph}" data-c="${k}"></label>`;
+// machines a programmed option covers ("RUN" = any of the runners)
+const progMachs = n => /^\s*run\b/i.test(n || '') ? ['True Form Runner', 'Woodway 4Front', 'Treadmill'] : [machOf(n)].filter(Boolean);
+let CARDIO_OPTS = [];   // the programmed "choose 1" cardio options for this session
+function cardioRow(p, it, mach){ const prog = new Set((CARDIO_OPTS.length ? CARDIO_OPTS : [it]).flatMap(o => progMachs(o.exercise))); mach = mach || progMachs(it.exercise)[0] || machOf(it.exercise); const n = mach || it.exercise, u = unitFor(n), f = (k, ph, lab) => `<label class="cf">${lab}<input type="${k === 'time' ? 'text' : 'number'}" inputmode="${k === 'time' ? 'numeric' : 'decimal'}" placeholder="${ph}" data-c="${k}"></label>`;
   const tm = /treadmill|woodway|4\s*front|true\s*form/i.test(n), incl = /treadmill|woodway|4\s*front/i.test(n), bike = /echo|bike/i.test(n), spd = u === 'mi' ? 'mph' : 'km/h';
   const extra = tm ? f('speed', spd, 'Speed') + (incl ? f('incline', '%', 'Incline') : f('cals', 'cal', 'Cals'))
     : bike ? f('watts', 'W', 'Avg W') + f('max_watts', 'W', 'Max W') + f('cadence', 'rpm', 'RPM') + f('cals', 'cal', 'Cals') : f('watts', 'W', 'Avg W') + f('cals', 'cal', 'Cals');
   return `<div class="mrow crow" data-m="${p.id}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.</div>
-    <div class="cgrid"><label class="cf">Machine<select data-c="machine">${[...(machOf(it.exercise) ? [] : [['', 'As Programmed']]), ...MACHINES.map(([m]) => [m, m])].map(([v, l]) => `<option value="${v}"${v === mach ? ' selected' : ''}>${l}${v && v === machOf(it.exercise) ? ' (Programmed)' : ''}</option>`).join('')}</select></label>${f('time', 'min:sec', 'Time')}<label class="cf">Distance<span style="display:flex;gap:4px"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x => `<option${x === u ? ' selected' : ''}>${x}</option>`).join('')}</select></span></label>${extra}</div>${noteBox()}</div>`; }
+    <div class="cgrid"><label class="cf">Machine<select data-c="machine">${[...(mach ? [] : [['', 'As Programmed']]), ...MACHINES.map(([m]) => [m, m])].map(([v, l]) => `<option value="${v}"${v === mach ? ' selected' : ''}>${l}${v && prog.has(v) ? ' (Programmed)' : ''}</option>`).join('')}</select></label>${f('time', 'min:sec', 'Time')}<label class="cf">Distance<span style="display:flex;gap:4px"><input type="number" inputmode="decimal" placeholder="0" data-c="distance"><select data-c="unit">${['m','km','mi','ft'].map(x => `<option${x === u ? ' selected' : ''}>${x}</option>`).join('')}</select></span></label>${extra}</div>${noteBox()}</div>`; }
 const isLift = it => it.sets && !/^(RELEASE|REACTIVE|RUN|RESILIENCY)/i.test((it.intensity || '').trim()) && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo || '');
 
 async function load(){
@@ -338,7 +352,9 @@ async function load(){
       ${picked.length > 1 ? '<button class="fille" title="Copy the first filled-in person to everyone (only empty boxes)">Apply To Everyone ↓</button>' : ''}
       ${picked.map(p => isCardio(it) ? cardioRow(p, it) : rowHtml(p, it)).join('')}
     </div>`; };
+  CARDIO_OPTS = items.filter(isCardio);
   const blockHtml = b => { let h = ''; const L = b.idx;
+    if (L.length > 1 && L.every(ix => isCardio(items[ix]))) return card(L[0]);   // Resiliency "choose 1": one card, machine per person
     for (let k = 0; k < L.length; k++) { const lbl = items[L[k]].tempo;
       if (lbl && items[L[k + 1]] && items[L[k + 1]].tempo === lbl && L[k + 1] !== undefined) {
         h += `<div class="chz">Choose 1 (fill in whichever they did)</div>`; }
@@ -492,7 +508,9 @@ $('saveAll').onclick = async () => {
   document.querySelectorAll('.crow').forEach(row => { const it = items[+row.closest('.ex').dataset.idx], o = { exercise_id: it.exercise_id, exercise: it.exercise };
     row.querySelectorAll('[data-c]').forEach(f => { if (f.value && f.dataset.c !== 'unit' && f.dataset.c !== 'machine') o[f.dataset.c] = f.dataset.c === 'time' ? f.value : parseFloat(f.value); });
     if (Object.keys(o).length > 2) { o.unit = row.querySelector('[data-c=unit]').value; const mc = (row.querySelector('[data-c=machine]') || {}).value;
-      if (mc) { o.machine = mc; if (mc !== machOf(it.exercise)) o.switched_from = machOf(it.exercise) || it.exercise; } per[row.dataset.m].cardio.push(o); } });
+      if (mc) { o.machine = mc; const hit = CARDIO_OPTS.find(x => progMachs(x.exercise).includes(mc));
+        if (hit) { o.exercise = hit.exercise; o.exercise_id = hit.exercise_id; } else o.switched_from = CARDIO_OPTS.map(x => x.exercise).join(' / ') || it.exercise; }
+      per[row.dataset.m].cardio.push(o); } });
   document.querySelectorAll('.ex').forEach(card => { const it = items[+card.dataset.idx];
     card.querySelectorAll('.mrow').forEach(row => { const md = row._mod, P = per[row.dataset.m];
       const oi = +row.dataset.o || 0, opt = (optsOf(it) || [])[oi], mx = md && md.alt ? {} : modeOf(it, oi);

@@ -166,20 +166,31 @@ let WEEKS = [], baseWeek = null;
 const todayKey = () => new Date().toLocaleDateString('en-CA');
 function pickedWeek(){ try { const v = JSON.parse(localStorage.getItem('empwrWeek') || 'null'); if (v && v.day === todayKey()) return v.week; } catch (e) {} return null; }
 function pickWeek(w){ try { localStorage.setItem('empwrWeek', JSON.stringify({ week: w, day: todayKey() })); } catch (e) {} }
-async function sessionRows(cols){ const res = await baseRows(); const rows = res.data || [];
+async function sessionRows(cols){ const res = await baseRows(); let rows = res.data || [];
   if (!rows.length) return res; baseWeek = rows[0].week;
   try {
     const { data: cur } = await sb.from('program_sessions').select('id,block_id,day,slot,week').eq('id', rows[0].session_id).single();
     if (!cur) return res;
     const { data: sib } = await sb.from('program_sessions').select('id,week,title,day,slot').eq('block_id', cur.block_id).eq('day', cur.day).eq('slot', cur.slot).order('week');
     WEEKS = [...new Set((sib || []).map(s => s.week))];
-    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w); if (!tgt) return res;
-    const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order');
-    const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
-    const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
-    const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
-    return { data: (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
-      exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })) };
+    const toRows = async (pi, tgt) => { const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
+      const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
+      const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
+      return (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
+        exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })); };
+    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w);
+    if (tgt) { const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order'); rows = await toRows(pi, tgt); }
+    // Resiliency "choose #1-6": the sheet puts option 1 on the Wk 2 row, option 2 on Wk 3, etc., so the sync spreads them across weeks.
+    // Pull every numbered option for this class from all weeks of the block and show them all, every week.
+    const { data: rp } = await sb.from('program_items').select('*').in('session_id', (sib || []).map(s => s.id)).ilike('intensity', 'RESILIENCY%').order('item_order');
+    const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
+    if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
+      opts.sort((a, b) => (parseInt(a.tempo) || 99) - (parseInt(b.tempo) || 99));
+      const isR = r => /^RESILIENCY/i.test((r.intensity || '').trim()) && !!r.exercise, at = rows.findIndex(isR), inten = at >= 0 ? rows[at].intensity : null;
+      const all = (await toRows(opts.map(o => ({ ...o, sets: o.sets || 1 })), me)).map(r => ({ ...r, intensity: inten || r.intensity }));
+      const kept = rows.filter(r => !isR(r)), pos = at < 0 ? kept.length : at;
+      rows = [...kept.slice(0, pos), ...all, ...kept.slice(pos)]; }
+    return { data: rows };
   } catch (e) { return res; } }
 const weekSel = w => WEEKS.length > 1 ? `<select class="weekSel" title="Which week of the program?">${WEEKS.map(x => `<option value="${x}"${x === w ? ' selected' : ''}>Week ${x}</option>`).join('')}</select>` : `Week ${w}`;
 const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
