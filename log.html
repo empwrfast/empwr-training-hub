@@ -365,7 +365,8 @@ async function loadSession(){
 
   // Blank sets/reps = same as the exercise before it in the block
   blocks.forEach(b=>b.idx.forEach((ix,k)=>{ const it=items[ix];
-    if (it.tempo && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo) && !it.sets && !repsOf(it) && k>0){ const pv=items[b.idx[k-1]]; it.sets=pv.sets; it.reps=pv.reps; } }));
+    if (it.tempo && !/^(COACH|FOAM|SET|TURF|FLOOR)$/.test(it.tempo) && !it.sets && !repsOf(it) && k>0){ const pv=items[b.idx[k-1]]; it.sets=pv.sets; it.reps=pv.reps; }
+    else if (it.tempo && !it.sets && k>0 && items[b.idx[k-1]].tempo === it.tempo && items[b.idx[k-1]].sets) it.sets = items[b.idx[k-1]].sets; }));   // choose-1 option with its own reps: same sets
   const letterOf = it => ((it.tempo||'').match(/^[A-Z]/i)||[''])[0].toUpperCase();
   const gapSet = new Set();
   const blockHtml = b => { let html='', prev=null; const L=b.idx;

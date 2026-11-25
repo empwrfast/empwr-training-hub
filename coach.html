@@ -261,7 +261,9 @@ async function load(){
   if (!items.length) { $('board').innerHTML = '<div class="card">No session programmed for today.</div>'; show('stepBoard'); return; }
   // blank sets/reps = same as the exercise before it in the block
   items.forEach((it, i) => { const pv = items[i - 1];
-    if (pv && it.tempo && !it.sets && !repsOf(it) && pv.intensity === it.intensity) { it.sets = pv.sets; it.reps = pv.reps; } });
+    if (pv && it.tempo && !it.sets && !repsOf(it) && pv.intensity === it.intensity) { it.sets = pv.sets; it.reps = pv.reps; }
+    // a "choose 1" option (same label as the one above) with its own reps but no sets: same number of sets
+    else if (pv && it.tempo && !it.sets && pv.sets && it.tempo === pv.tempo && pv.intensity === it.intensity) it.sets = pv.sets; });
   const [{ data: lib }, { data: fams }] = await Promise.all([
     sb.from('exercises').select('id,name,family_id,unilateral').eq('active', true).order('name').limit(2000),
     sb.from('exercise_families').select('id,name').order('id')]);

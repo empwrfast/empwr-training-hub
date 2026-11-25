@@ -223,7 +223,8 @@ function groupHtml(list, card){
 // Blank sets/reps = same as the exercise before it in the block
 function fillReps(list){
   list.forEach((r,i)=>{ const reps = String(r.reps||'').split('|').pop().trim();
-    if (r.tempo && !WU.test(r.tempo) && !r.sets && !reps && i > 0){ r.sets = list[i-1].sets; r.reps = list[i-1].reps; } });
+    if (r.tempo && !WU.test(r.tempo) && !r.sets && !reps && i > 0){ r.sets = list[i-1].sets; r.reps = list[i-1].reps; }
+    else if (r.tempo && !r.sets && i > 0 && list[i-1].tempo === r.tempo && list[i-1].sets) r.sets = list[i-1].sets; });   // choose-1 option with its own reps: same sets
 }
 // Warm-up: coach note, foam roll, then the set split into two sections
 const WU = /^(COACH|FOAM|SET|TURF|FLOOR)$/;
