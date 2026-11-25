@@ -195,11 +195,14 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
     const LBL = /^[A-Z]\d\)$/, key = r => (r.intensity || '').trim() + '|' + (r.tempo || '').trim();
     for (const k of [...new Set(rows.filter(r => LBL.test((r.tempo || '').trim()) && !/^RESILIENCY/i.test((r.intensity || '').trim())).map(key))]) {
       const grp = (allp || []).filter(x => key(x) === k && x.exercise_id); if (grp.length < 2) continue;
-      const wr = grp.find(x => wkOf[x.session_id] === W && !x.sets && (x.reps || '').replace(/[|\s]/g, ''));
       const inRows = rows.filter(r => key(r) === k), main = inRows.find(r => r.sets) || inRows[0]; if (!main) continue;
-      if (wr) inRows.forEach(r => { r.reps = wr.reps; });
+      // weekly prescription: start from the main lift, then carry forward whatever the option rows set in weeks 2..W (blank = same as before)
+      const w1 = grp.filter(x => wkOf[x.session_id] === Math.min(...grp.map(y => wkOf[y.session_id]))), mainId = (w1.find(x => x.sets) || w1[0] || {}).exercise_id;
+      const tail = v => String(v || '').split('|').pop().trim(); let S = main.sets, R = tail(main.reps);
+      for (let w = 2; w <= W; w++) { const o = grp.find(x => wkOf[x.session_id] === w && x.exercise_id !== mainId); if (!o) continue; if (o.sets) S = o.sets; if (tail(o.reps)) R = tail(o.reps); }
+      inRows.forEach(r => { r.sets = S; r.reps = R; });
       const have = new Set(inRows.map(r => r.exercise)), extra = [];
-      for (const x of grp) { if (x.sets || extra.some(e => e.exercise_id === x.exercise_id)) continue; extra.push({ ...x, sets: null, reps: wr ? wr.reps : main.reps, item_order: main.item_order }); }
+      for (const x of grp) { if (x.exercise_id === mainId || extra.some(e => e.exercise_id === x.exercise_id)) continue; extra.push({ ...x, sets: S, reps: R, item_order: main.item_order }); }
       const me2 = (sib || []).find(s => s.week === W) || { id: rows[0].session_id, title: rows[0].title, week: W, day: rows[0].day };
       const add = (await toRows(extra, me2)).filter(r => !have.has(r.exercise)).map(r => ({ ...r, intensity: main.intensity }));
       if (add.length) { const last = rows.lastIndexOf(inRows[inRows.length - 1]); rows.splice(last + 1, 0, ...add); } }
