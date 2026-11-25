@@ -285,6 +285,8 @@ const isCardio = it => /^RESILIENCY/i.test((it.intensity || '').trim()) && !!(it
 const unitFor = n => /versa/i.test(n) ? 'ft' : /true\s*form/i.test(n) ? 'km' : /woodway|4\s*front/i.test(n) ? 'mi' : /echo|bike/i.test(n) ? 'mi' : /ski|row/i.test(n) ? 'm' : /treadmill/i.test(n) ? 'km' : 'm';
 // cardio machines at EMPWR: coach can switch someone to another machine (fields + units follow the machine)
 const MACHINES = [['Versa Climber', /versa/i], ['Echo Bike', /echo|bike/i], ['Ski Erg', /ski/i], ['Rower', /\brow/i], ['True Form Runner', /true\s*form/i], ['Woodway 4Front', /woodway|4\s*front/i], ['Treadmill', /treadmill/i]];
+// the task without the machine name: "ROWING MACHINE • 2 min max dist" -> "2 min max dist"
+const cardioTask = n => { n = String(n || ''); return (n.includes('•') ? n.split('•').slice(1).join('•') : n.replace(/^(echo bike|rowing machine|rower|versa climber|ski erg|run|bike)\s*/i, '')).trim(); };
 const machOf = n => (MACHINES.find(([, rx]) => rx.test(n || '')) || [''])[0];
 function cardioRow(p, it, mach){ mach = mach || machOf(it.exercise); const n = mach || it.exercise, u = unitFor(n), f = (k, ph, lab) => `<label class="cf">${lab}<input type="${k === 'time' ? 'text' : 'number'}" inputmode="${k === 'time' ? 'numeric' : 'decimal'}" placeholder="${ph}" data-c="${k}"></label>`;
   const tm = /treadmill|woodway|4\s*front|true\s*form/i.test(n), incl = /treadmill|woodway|4\s*front/i.test(n), bike = /echo|bike/i.test(n), spd = u === 'mi' ? 'mph' : 'km/h';
@@ -331,7 +333,7 @@ async function load(){
 
   const card = idx => { const it = items[idx], mult = multOf(it), rg = maxRange(it);
     return `<div class="card ex" data-idx="${idx}" data-mult="${mult}">
-      <div class="exhead"><h3><span class="lbl">${esc(it.tempo || '')}</span>${esc(it.exercise)}</h3><b>${esc(schemeOf(it))}</b></div>
+      <div class="exhead">${isCardio(it) ? `<h3>Choose Your Machine <span style="font-family:Montserrat,sans-serif;font-size:15px;font-weight:600;color:var(--mute)">${esc(cardioTask(it.exercise))}</span></h3>` : `<h3><span class="lbl">${esc(it.tempo || '')}</span>${esc(it.exercise)}</h3><b>${esc(schemeOf(it))}</b>`}</div>
       ${isMax(it) ? `<div class="rule">Week 1 Weight. ${it.sets > 1 ? `${it.sets === 2 ? 'Set 1' : it.sets === 3 ? 'Sets 1 + 2' : `Sets 1 to ${it.sets - 1}`}: Same Reps As Last Week. ` : ''}Set ${it.sets}: Max Reps (Min ${rg[0]}, Max ${rg[1]})${mult === 2 ? '. Each Side' : ''}.</div>` : ''}
       ${picked.length > 1 ? '<button class="fille" title="Copy the first filled-in person to everyone (only empty boxes)">Apply To Everyone ↓</button>' : ''}
       ${picked.map(p => isCardio(it) ? cardioRow(p, it) : rowHtml(p, it)).join('')}
