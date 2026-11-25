@@ -4,6 +4,7 @@
 <title>EMPWR Coach Board</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js" data-mode="staff"></script>
 <style>
 :root{--ink:#12161F;--red:#EB5345;--bg:#fff;--fg:#12161F;--card:#F3F4F6;--line:#D9DCE1;--mute:#8a8f98}
 *{box-sizing:border-box;margin:0}
@@ -107,6 +108,11 @@ button{font:inherit;cursor:pointer}
     <div id="hereNote" style="font-size:13px;color:var(--mute);margin-top:8px"></div>
   </div>
   <button class="main" id="startBtn" disabled>Start Logging</button>
+  <div class="card" id="pinCard" style="margin-top:18px">
+    <b>Reset A Member's iPad PIN</b>
+    <div style="font-size:13px;color:var(--mute);margin:4px 0 8px">They pick a new one next time they tap their name.</div>
+    <input id="pinQ" placeholder="Type a member's name" autocomplete="off"><div id="pinRes"></div><div id="pinOk" style="font-size:14px;font-weight:700;margin-top:6px"></div>
+  </div>
 </section>
 
 <!-- STEP 2: board -->
@@ -126,7 +132,7 @@ button{font:inherit;cursor:pointer}
 </section>
 
 <script>
-const sb = supabase.createClient("https://utljgnuieyjdqclfiwqz.supabase.co", "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3", { db: { schema: 'sgpt' } });
+const sb = EMPWR.sb; // shared signed-in client (auth.js)
 // Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
 const fmtSlot = s => { if (!s) return ''; if (s === 'open') return 'Open Gym'; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
@@ -629,5 +635,16 @@ async function applyDraft(d){ restoring = true; WL = d.wl || {};
     <button class="main" id="resumeBtn" style="margin:0">Pick Up Where I Left Off</button><button id="discardBtn" style="border:0;background:none;color:var(--mute);margin-top:8px;width:100%">Start Fresh Instead</button>`;
   $('discardBtn').onclick = () => { clearDraft(); el.classList.add('hidden'); };
   $('resumeBtn').onclick = async () => { if (d.slot) pickSlot(d.slot); picked = d.picked; el.innerHTML = 'Loading...'; await load(); await applyDraft(d); el.classList.add('hidden'); saveDraft(true); }; })();
+
+// reset a forgotten iPad PIN
+let pinT; $('pinQ').oninput = e => { clearTimeout(pinT); pinT = setTimeout(async () => {
+  const q = e.target.value.trim(); $('pinOk').textContent = ''; if (q.length < 2) { $('pinRes').innerHTML = ''; return; }
+  const { data } = await sb.from('members').select('id,first_name,last_name').eq('active', true).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(6);
+  $('pinRes').innerHTML = (data || []).map(m => `<button class="main" style="background:var(--ink);font-size:20px;padding:8px" data-id="${m.id}" data-n="${m.first_name} ${m.last_name}">Reset ${m.first_name} ${m.last_name}</button>`).join('');
+}, 250); };
+$('pinRes').onclick = async e => { const b = e.target.closest('button'); if (!b) return;
+  const r = await sb.rpc('clear_member_pin', { p_member: String(b.dataset.id) });
+  $('pinRes').innerHTML = ''; $('pinQ').value = '';
+  $('pinOk').textContent = r.error ? 'Could not reset. Is this device signed in?' : `Done. ${b.dataset.n} picks a new PIN next time.`; };
 </script>
 </body></html>

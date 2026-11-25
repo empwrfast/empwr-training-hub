@@ -4,6 +4,7 @@
 <title>EMPWR Today's Lift</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js" data-mode="staff"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6}
@@ -154,7 +155,7 @@ const SUPABASE_URL = "https://utljgnuieyjdqclfiwqz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3";
 const APP_URL = "https://empwrfast.github.io/empwr-training-hub/log.html";
 // ================================================================
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'sgpt' } });
+const sb = EMPWR.sb; // shared signed-in client (auth.js)
 // Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
 const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }

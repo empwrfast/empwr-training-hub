@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#12161F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My EMPWR">
+<title>My EMPWR</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js" data-mode="member"></script>
+<style>
+:root{--onyx:#12161F;--ink:#12161F;--red:#EB5345;--bg:#FFFFFF;--fg:#12161F;--card:#F3F4F6;--line:#D9DCE1;--mute:#6B7383;--good:#2FA84F}
+body.dark{--ink:#2C3446;--bg:#12161F;--fg:#FFFFFF;--card:#1C2230;--line:#2C3446;--mute:#9AA2B1}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:Montserrat,sans-serif;max-width:640px;margin:auto;padding:14px 14px 90px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+header img{height:40px}
+body.dark .logo-onyx,body:not(.dark) .logo-white{display:none}
+.hbtn{background:none;border:2px solid var(--fg);color:var(--fg);border-radius:20px;height:36px;padding:0 12px;cursor:pointer;font:700 12px Montserrat,sans-serif}
+h1{font-family:'Bebas Neue';font-size:40px;letter-spacing:.04em;line-height:1}
+h2{font-family:'Mr Dafoe';font-weight:400;font-size:32px;margin:-4px 0 10px;color:var(--red)}
+h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;margin-bottom:8px}
+.card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}
+.hidden{display:none!important}
+#tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;padding:8px 0}
+#tabs button{flex:1;white-space:nowrap;font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;padding:10px 4px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+#tabs button.on{background:var(--red);border-color:var(--red);color:#fff}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{background:var(--ink);color:#fff;border-radius:10px;padding:12px;text-align:center}
+.tile b{display:block;font-family:'Bebas Neue';font-size:34px;line-height:1}
+.tile span{font-size:11px;font-weight:800;letter-spacing:.03em}
+.sub{font-size:12px;color:var(--mute);margin:-4px 0 8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.row:first-of-type{border-top:0}
+.row .nm{font-weight:800}
+.row .r{text-align:right;white-space:nowrap}
+.up{color:var(--good);font-weight:800}
+.tap{cursor:pointer}
+.fam{font-family:'Bebas Neue';font-size:18px;letter-spacing:.06em;color:var(--mute);margin:14px 0 2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chips span{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:13px}
+.sess .ex{padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+.sess .ex:first-child{border-top:0}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;max-width:320px;margin:auto}
+.cal i{display:block;aspect-ratio:1;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.cal i.on{background:var(--red);border-color:var(--red)}
+.cal em{font-style:normal;font-size:10px;font-weight:800;color:var(--mute);text-align:center}
+svg text{font-family:Montserrat,sans-serif}
+.tip{font-size:13px;font-weight:700;min-height:18px;margin-top:4px}
+button.main{font-family:'Bebas Neue';font-size:22px;letter-spacing:.05em;width:100%;padding:12px;border:0;border-radius:10px;background:var(--red);color:#fff;cursor:pointer;margin-top:10px}
+input{font:inherit;width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+footer{text-align:center;margin-top:24px}footer img{height:34px}
+</style></head>
+<body>
+<header>
+  <img class="logo-onyx" src="empwr-logo-en-tag-onyx.svg" alt="EMPWR Fitness and Sports Training">
+  <img class="logo-white" src="empwr-logo-en-tag-white.svg" alt="EMPWR Fitness and Sports Training">
+  <div style="display:flex;gap:6px"><button class="hbtn" id="theme">☀️</button><button class="hbtn" id="out">Sign Out</button></div>
+</header>
+
+<section id="staffPick" class="hidden card">
+  <h3>Coach View</h3><div class="sub">Pick a member to see their portal.</div>
+  <input id="q" placeholder="Start typing a name" autocomplete="off"><div id="qr"></div>
+</section>
+
+<section id="app" class="hidden">
+  <h1 id="hi">My Progress</h1><h2>Your Weights, Weeks And PRs</h2>
+  <nav id="tabs">
+    <button data-t="over" class="on">Overview</button><button data-t="lifts">Lifts</button>
+    <button data-t="hist">History</button><button data-t="feel">Check-In</button>
+  </nav>
+  <div id="over"></div><div id="lifts" class="hidden"></div><div id="hist" class="hidden"></div><div id="feel" class="hidden"></div>
+</section>
+
+<footer><img src="pitter-patter-red.svg" alt="Pitter Patter Make It Matter"></footer>
+
+<script>
+const sb = EMPWR.sb, $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString('en-CA');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const day = d => new Date(d).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }).replace(/\./g, '');
+const short = d => new Date(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '');
+const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.getTime(); };
+const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
+// Estimated 5RM from any set of 1 to 12 reps (EMPWR does not test 1RMs)
+const e5 = (w, r) => (w > 0 && r >= 1 && r <= 12) ? w * (1 + r / 30) / (1 + 5 / 30) : 0;
+const lb = x => (+x.weight || 0) * (+x.reps || 0);
+
+// theme
+if (localStorage.getItem('empwrTheme') === 'dark') document.body.classList.add('dark');
+$('theme').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('empwrTheme', document.body.classList.contains('dark') ? 'dark' : 'light'); };
+$('out').onclick = () => EMPWR.signOut();
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  ['over','lifts','hist','feel'].forEach(t => $(t).classList.toggle('hidden', t !== b.dataset.t)); scrollTo(0, 0); });
+
+// Simple single-series bar chart (one hue, values on tap)
+function bars(id, pts, unit) {
+  if (!pts.length) return '<div class="sub">Nothing yet.</div>';
+  const W = 600, H = 170, pad = 22, max = Math.max(1, ...pts.map(p => p.v)), bw = (W - 10) / pts.length;
+  const rects = pts.map((p, i) => { const h = Math.max(2, (p.v / max) * (H - pad - 18)), x = 5 + i * bw;
+    return `<g class="tap" data-tip="${esc(p.label)}: ${fmt(p.v)} ${unit}"><rect x="${x}" y="0" width="${bw}" height="${H}" fill="transparent"/>
+      <rect x="${x + 2}" y="${H - pad - h}" width="${Math.max(2, bw - 4)}" height="${h}" rx="4" fill="var(--red)"/>
+      ${pts.length <= 8 || i % Math.ceil(pts.length / 6) === 0 ? `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="17" fill="var(--mute)">${esc(p.short)}</text>` : ''}</g>`; }).join('');
+  return `<svg id="${id}" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${unit} chart">
+    <line x1="0" x2="${W}" y1="${H - pad}" y2="${H - pad}" stroke="var(--line)"/>${rects}</svg><div class="tip" id="${id}-tip">Tap a bar to see the number.</div>`;
+}
+// Line of estimated 5RM over time
+function line(id, pts) {
+  if (pts.length < 2) return '';
+  const W = 600, H = 150, px = 30, py = 16, vs = pts.map(p => p.v), lo = Math.min(...vs) * .95, hi = Math.max(...vs) * 1.02 || 1;
+  const X = i => px + i * (W - 2 * px) / (pts.length - 1), Y = v => H - py - (v - lo) / (hi - lo || 1) * (H - 2 * py);
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ');
+  return `<svg id="${id}" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Estimated 5RM over time">
+    <path d="${d}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((p, i) => `<g class="tap" data-tip="${esc(p.label)}: ${fmt(p.v)} lb est. 5RM"><circle cx="${X(i)}" cy="${Y(p.v)}" r="14" fill="transparent"/><circle cx="${X(i)}" cy="${Y(p.v)}" r="5" fill="var(--red)" stroke="var(--card)" stroke-width="2"/></g>`).join('')}
+    <text x="${px}" y="${H - 1}" font-size="17" fill="var(--mute)">${esc(pts[0].short)}</text>
+    <text x="${W - px}" y="${H - 1}" font-size="17" fill="var(--mute)" text-anchor="end">${esc(pts[pts.length - 1].short)}</text></svg>
+    <div class="tip" id="${id}-tip">Tap a dot to see the number.</div>`;
+}
+document.addEventListener('click', e => { const g = e.target.closest('[data-tip]'); if (!g) return; const s = g.closest('svg'); const t = s && $(s.id + '-tip'); if (t) t.textContent = g.dataset.tip; });
+
+let D = null;
+async function load(member) {
+  $('app').classList.remove('hidden');
+  $('hi').textContent = `${member.first_name}'s Progress`;
+  ['over','lifts','hist','feel'].forEach(t => $(t).innerHTML = '<div class="card">Loading...</div>');
+  const mid = member.id;
+  const [sl, wl, pr, rc] = await Promise.all([
+    sb.from('set_logs').select('exercise_id,set_number,weight,reps,workout_log_id,created_at').eq('member_id', mid).order('created_at').limit(20000),
+    sb.from('workout_logs').select('id,session_id,created_at,notes').eq('member_id', mid).order('created_at').limit(5000),
+    sb.from('personal_records').select('exercise_id,pr_type,value,achieved_on').eq('member_id', mid).order('achieved_on', { ascending: false }).limit(500),
+    sb.from('readiness_checkins').select('*').eq('member_id', mid).order('checkin_date').limit(2000)]);
+  const sets = sl.data || [], logs = wl.data || [], prs = pr.data || [], checks = (rc.data || []).map(c => ({ ...c, created_at: c.created_at || (c.checkin_date + 'T12:00') }));
+  const exIds = [...new Set([...sets.map(s => s.exercise_id), ...prs.map(p => p.exercise_id)])].filter(Boolean);
+  const sesIds = [...new Set(logs.map(l => l.session_id))].filter(Boolean);
+  const [ex, ses, fam] = await Promise.all([
+    exIds.length ? sb.from('exercises').select('id,name,family_id').in('id', exIds) : { data: [] },
+    sesIds.length ? sb.from('program_sessions').select('id,title,week,day').in('id', sesIds) : { data: [] },
+    sb.from('exercise_families').select('id,name')]);
+  D = { member, sets, logs, prs, checks,
+    ex: Object.fromEntries((ex.data || []).map(e => [e.id, e])),
+    ses: Object.fromEntries((ses.data || []).map(s => [s.id, s])),
+    fam: Object.fromEntries((fam.data || []).map(f => [f.id, f.name])) };
+  renderOverview(); renderLifts(); renderHistory(); renderFeel();
+}
+
+function sessionsWithDates() {
+  // a session is a workout log; date = when it was logged
+  const byLog = {}; D.sets.forEach(s => (byLog[s.workout_log_id] ||= []).push(s));
+  return D.logs.map(l => ({ ...l, sets: byLog[l.id] || [], lb: (byLog[l.id] || []).reduce((a, s) => a + lb(s), 0) }));
+}
+
+function renderOverview() {
+  const S = sessionsWithDates();
+  if (!S.length && !D.sets.length) { $('over').innerHTML = '<div class="card">Nothing logged yet. Log your first session on the iPad at the gym and your progress starts here.</div>'; return; }
+  const total = D.sets.reduce((a, s) => a + lb(s), 0);
+  const now = new Date(), mk = ymd(now).slice(0, 7);
+  const monthLb = D.sets.filter(s => ymd(s.created_at).startsWith(mk)).reduce((a, s) => a + lb(s), 0);
+  const days = new Set(S.map(s => ymd(s.created_at)));
+  const monthDays = [...days].filter(d => d.startsWith(mk)).length;
+  // week streak: consecutive weeks (ending this week or last) with at least one session
+  const wks = new Set(S.map(s => monday(s.created_at))); let streak = 0, w = monday(now);
+  if (!wks.has(w)) w -= 7 * 864e5;
+  while (wks.has(w)) { streak++; w -= 7 * 864e5; }
+  // months
+  const M = {}; D.sets.forEach(s => { const k = ymd(s.created_at).slice(0, 7); M[k] = (M[k] || 0) + lb(s); });
+  const months = Object.keys(M).sort().slice(-12).map(k => { const d = new Date(k + '-15'); return { v: M[k], label: d.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' }), short: d.toLocaleDateString('en-CA', { month: 'short' }).replace('.', '') }; });
+  const recent = S.slice(-10).map(s => ({ v: s.lb, label: day(s.created_at), short: short(s.created_at) })).filter(p => p.v > 0);
+  // last 8 weeks calendar
+  const start = monday(now) - 7 * 7 * 864e5; let cal = ['M','T','W','T','F','S','S'].map(x => `<em>${x}</em>`).join('');
+  for (let i = 0; i < 56; i++) { const d = new Date(start + i * 864e5); cal += `<i class="${days.has(ymd(d)) ? 'on' : ''}" title="${day(d)}"></i>`; }
+  const P = D.prs.slice(0, 8), lbl = { heaviest: 'Heaviest', est_5rm: 'Est. 5RM', session_volume: 'Best Volume' };
+  $('over').innerHTML = `
+    <div class="card tiles">
+      <div class="tile"><b>${S.length}</b><span>SESSIONS</span></div>
+      <div class="tile"><b>${streak}</b><span>WEEK STREAK</span></div>
+      <div class="tile"><b>${fmt(total)}</b><span>LB MOVED ALL TIME</span></div>
+      <div class="tile"><b>${fmt(monthLb)}</b><span>LB THIS MONTH</span></div></div>
+    <div class="card"><h3>Your Last 8 Weeks</h3><div class="sub">${monthDays} day${monthDays === 1 ? '' : 's'} in this month. Red = you trained.</div><div class="cal">${cal}</div></div>
+    <div class="card"><h3>Pounds Moved Per Month</h3>${bars('cm', months, 'lb')}</div>
+    ${recent.length ? `<div class="card"><h3>Pounds Moved Per Session</h3><div class="sub">Your last ${recent.length} sessions.</div>${bars('cs', recent, 'lb')}</div>` : ''}
+    ${P.length ? `<div class="card"><h3>🔥 Latest PRs</h3>${P.map(p => `<div class="row"><span><span class="nm">${esc(D.ex[p.exercise_id]?.name || 'Exercise')}</span><br>${lbl[p.pr_type] || esc(p.pr_type)}</span><span class="r"><b>${fmt(+p.value)}</b><br>${short(p.achieved_on + 'T12:00')}</span></div>`).join('')}</div>` : ''}`;
+}
+
+function liftStats(id) {
+  const sets = D.sets.filter(s => s.exercise_id === id);
+  const W = {}; sets.forEach(s => { const k = monday(s.created_at); const v = e5(+s.weight, +s.reps); if (v > (W[k] || 0)) W[k] = v; });
+  const pts = Object.keys(W).map(Number).sort((a, b) => a - b).map(k => ({ v: W[k], label: 'Week of ' + short(k), short: short(k) }));
+  const vol = {}; sets.forEach(s => vol[s.workout_log_id] = (vol[s.workout_log_id] || 0) + lb(s));
+  const heavy = sets.reduce((a, s) => Math.max(a, +s.weight || 0), 0);
+  return { sets, pts, best5: Math.max(0, ...pts.map(p => p.v)), bestVol: Math.max(0, ...Object.values(vol)), heavy, last: sets[sets.length - 1] };
+}
+
+function renderLifts() {
+  const ids = [...new Set(D.sets.map(s => s.exercise_id))].filter(Boolean);
+  if (!ids.length) { $('lifts').innerHTML = '<div class="card">Your lifts show up here once you log them.</div>'; return; }
+  const groups = {}; ids.forEach(id => { const f = D.fam[D.ex[id]?.family_id] || 'Other'; (groups[f] ||= []).push(id); });
+  const order = ['Squat','Hinge','Horizontal Push','Vertical Push','Horizontal Pull','Vertical Pull','Single Leg','Jump','Sprint','Throw','Core','Other'];
+  const html = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99 || a.localeCompare(b)).map(f =>
+    `<div class="fam">${esc(f)}</div>` + groups[f].map(id => { const st = liftStats(id), p = st.pts, up = p.length > 1 ? p[p.length - 1].v - p[0].v : 0;
+      return `<div class="row tap" data-lift="${id}"><span><span class="nm">${esc(D.ex[id]?.name || 'Exercise')}</span><br><span class="sub">Last: ${+st.last.weight ? +st.last.weight + ' lb' : 'BW'} × ${st.last.reps}, ${short(st.last.created_at)}</span></span>
+        <span class="r">${st.best5 ? `<b>${fmt(st.best5)}</b> est. 5RM` : ''}${up > 0 ? `<br><span class="up">+${fmt(up)} lb</span>` : ''}</span></div>`; }).join('')).join('');
+  $('lifts').innerHTML = `<div class="card" id="liftList"><h3>Your Lifts</h3><div class="sub">Est. 5RM = the best 5-rep weight your sets point to. Tap a lift for its full history.</div>${html}</div><div id="liftDetail"></div>`;
+  $('lifts').querySelectorAll('[data-lift]').forEach(r => r.onclick = () => liftDetail(r.dataset.lift));
+}
+
+function liftDetail(id) {
+  const st = liftStats(id), byLog = {};
+  st.sets.forEach(s => (byLog[s.workout_log_id] ||= []).push(s));
+  const rows = Object.values(byLog).reverse().map(ss => `<div class="row"><span><b>${day(ss[0].created_at)}</b><div class="chips">${ss.sort((a, b) => a.set_number - b.set_number).map(s => `<span>${+s.weight ? +s.weight : 'BW'} × ${s.reps}</span>`).join('')}</div></span><span class="r">${fmt(ss.reduce((a, s) => a + lb(s), 0))} lb</span></div>`).join('');
+  $('liftList').classList.add('hidden');
+  $('liftDetail').innerHTML = `<button class="main" style="background:var(--ink);margin-top:4px" id="liftBack">‹ All Lifts</button><div class="card"><h3>${esc(D.ex[id]?.name || 'Exercise')}</h3>
+    <div class="tiles" style="margin-bottom:10px"><div class="tile"><b>${fmt(st.best5)}</b><span>BEST EST. 5RM</span></div><div class="tile"><b>${fmt(st.bestVol)}</b><span>BEST SESSION VOLUME (LB)</span></div></div>
+    ${line('ld', st.pts)}<h3 style="margin-top:12px">Every Time You Did It</h3>${rows}</div>`;
+  $('liftBack').onclick = () => { $('liftDetail').innerHTML = ''; $('liftList').classList.remove('hidden'); scrollTo(0, 0); };
+  scrollTo(0, 0);
+}
+
+function renderHistory() {
+  const S = sessionsWithDates().filter(s => s.sets.length).reverse();
+  if (!S.length) { $('hist').innerHTML = '<div class="card">Your sessions show up here once you log them.</div>'; return; }
+  $('hist').innerHTML = `<div class="sub" style="margin-top:8px">Every session you've logged, so you can repeat any workout anywhere.</div>` + S.map(s => {
+    const ps = D.ses[s.session_id], by = {}; s.sets.forEach(x => (by[x.exercise_id] ||= []).push(x));
+    return `<div class="card sess"><div class="row" style="border:0;padding-top:0"><span><span class="nm">${day(s.created_at)}</span>${ps ? `<br><span class="sub">${esc(ps.title || '')}${ps.week ? ' · Week ' + esc(ps.week) : ''}</span>` : ''}</span><span class="r"><b>${fmt(s.lb)}</b> lb</span></div>
+      ${Object.keys(by).map(id => `<div class="ex"><b>${esc(D.ex[id]?.name || 'Exercise')}</b><div class="chips">${by[id].sort((a, b) => a.set_number - b.set_number).map(x => `<span>${+x.weight ? +x.weight : 'BW'} × ${x.reps}</span>`).join('')}</div></div>`).join('')}</div>`; }).join('');
+}
+
+function renderFeel() {
+  const C = D.checks; const K = [['sleep','Sleep'],['energy','Energy'],['soreness','Soreness'],['stress','Stress']];
+  if (!C.length) { $('feel').innerHTML = '<div class="card">Your readiness check-ins show up here.</div>'; return; }
+  const last4 = C.filter(c => Date.now() - new Date(c.created_at) < 28 * 864e5), avg = (arr, k) => arr.length ? arr.reduce((a, c) => a + (+c[k] || 0), 0) / arr.length : 0;
+  const recent = C.slice(-12).map(c => ({ v: K.reduce((a, [k]) => a + (+c[k] || 0), 0), label: day(c.created_at), short: short(c.created_at) }));
+  $('feel').innerHTML = `<div class="card"><h3>How You've Been Feeling</h3><div class="sub">Your average over the last 4 weeks, out of 5 (5 is best).</div>
+    ${K.map(([k, n]) => `<div class="row"><span class="nm">${n}</span><span class="r"><b>${last4.length ? avg(last4, k).toFixed(1) : '·'}</b> / 5</span></div>`).join('')}</div>
+    <div class="card"><h3>Check-In Score</h3><div class="sub">All four added up (20 is best). Your last ${recent.length} check-ins.</div>${bars('cf', recent, 'points')}</div>`;
+}
+
+// Coach view: staff can open any active member
+let qt; $('q').oninput = e => { clearTimeout(qt); qt = setTimeout(async () => {
+  const q = e.target.value.trim(); if (q.length < 2) { $('qr').innerHTML = ''; return; }
+  const { data } = await sb.from('members').select('id,first_name,last_name').eq('active', true).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(8);
+  $('qr').innerHTML = (data || []).map(m => `<button class="main" style="background:var(--ink)" data-id="${m.id}">${esc(m.first_name)} ${esc(m.last_name)}</button>`).join('');
+  $('qr').querySelectorAll('button').forEach(b => b.onclick = () => { const m = data.find(x => String(x.id) === b.dataset.id); load(m); scrollTo(0, 0); });
+}, 250); };
+
+EMPWR.start().then(w => {
+  if (w.member) return load(w.member);
+  $('staffPick').classList.remove('hidden');
+});
+</script></body></html>

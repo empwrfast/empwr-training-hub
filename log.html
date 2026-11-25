@@ -4,6 +4,7 @@
 <title>EMPWR Log Your Lift</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js" data-mode="staff"></script>
 <style>
 :root{--ink:#12161F;--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6;--line:#D9DCE1}
 body.dark{--ink:#2C3446;--bg:var(--onyx);--fg:var(--wht);--card:#1C2230;--line:#2C3446}
@@ -112,7 +113,18 @@ body{max-width:900px}
     <input id="search" placeholder="Start typing your name" autocomplete="off">
     <div id="results"></div>
   </div>
-  <div class="card" style="font-size:13px">Coach mode: pick any member and log for them.</div>
+  <div class="card" style="font-size:13px">Logging for someone else? Use the Coach Board. Forgot your PIN? Ask a coach to reset it.</div>
+</section>
+
+<!-- STEP 1B: PIN (keeps each member's progress private on the shared iPad) -->
+<section id="stepPin" class="hidden">
+  <h1 id="pinT">Your PIN</h1><h2 id="pinS">Keep Your Numbers Private</h2>
+  <div class="card" style="text-align:center">
+    <div id="pinMsg" style="font-size:14px;margin-bottom:10px"></div>
+    <div id="pinDots" style="font-family:'Bebas Neue';font-size:44px;letter-spacing:.3em;min-height:52px"></div>
+    <div id="pinPad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:340px;margin:10px auto 0"></div>
+  </div>
+  <button class="main sec" id="pinBack">Not Me, Go Back</button>
 </section>
 
 <!-- STEP 2: READINESS -->
@@ -148,7 +160,7 @@ body{max-width:900px}
 const SUPABASE_URL = "https://utljgnuieyjdqclfiwqz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2nvvJMGijP5Q2OKHZMphEg_fVhCMeW3";
 // ================================================================
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'sgpt' } });
+const sb = EMPWR.sb; // shared signed-in client (auth.js)
 // Class time slots: shows the class on now (from 20 min before it starts); tap the time to switch classes
 const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return ((h + 11) % 12 + 1) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'AM' : 'PM'); };
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
@@ -294,7 +306,7 @@ document.addEventListener('click',e=>{ const b=e.target.closest('.addset'); if(!
   b.parentElement.querySelector('[data-vol]').before(c); updVol(); });
 document.addEventListener('click',e=>{ const b=e.target.closest('.addwu'); if(!b) return; const box=b.previousElementSibling, n=box.children.length+1;
   box.insertAdjacentHTML('beforeend',`<div class="wset"><span>W${n}</span><input type="number" inputmode="decimal" placeholder="lb" data-w><input type="number" inputmode="numeric" placeholder="reps" data-r></div>`); });
-const show = id => ['stepWho','stepReady','stepSession','stepProg'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
+const show = id => ['stepWho','stepPin','stepReady','stepSession','stepProg'].forEach(s=>$(s).classList.toggle('hidden', s!==id));
 const round5 = w => Math.round(w/5)*5;
 
 // STEP 1
@@ -303,8 +315,39 @@ let t; $('search').oninput = e => { clearTimeout(t); t = setTimeout(async()=>{
   const { data } = await sb.from('members').select('id,first_name,last_name')
     .eq('active',true).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(8);
   $('results').innerHTML = (data||[]).map(m=>`<button class="main" style="background:var(--onyx)" data-id="${m.id}" data-n="${m.first_name}">${m.first_name} ${m.last_name}</button>`).join('');
-  $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>{ member={id:b.dataset.id,first:b.dataset.n}; startReady(); });
+  $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>{ member={id:b.dataset.id,first:b.dataset.n}; pinGate(member).then(ok => ok && startReady()); });
 },250); };
+
+// PIN on the shared iPad: first time a member sets a 4-digit PIN, after that they punch it in.
+// Coaches can clear a forgotten PIN from the Coach Board. Skipped if the database login step isn't in yet.
+async function pinGate(m){
+  const st = await sb.rpc('pin_status', { p_member: String(m.id) });
+  if (st.error) return true;
+  return new Promise(resolve => {
+    let mode = st.data === 'none' ? 'new' : 'enter', first = '', cur = '';
+    const msg = { enter: `Hey ${m.first}, punch in your PIN.`, new: `Hey ${m.first}, pick a 4-digit PIN. You'll use it every time on this iPad.`, confirm: 'Punch it in once more to confirm.' };
+    const draw = (note) => { $('pinMsg').innerHTML = note || msg[mode]; $('pinDots').textContent = '●'.repeat(cur.length) + '○'.repeat(4 - cur.length); };
+    if (st.data === 'locked') { show('stepPin'); $('pinPad').innerHTML = ''; draw('Too many tries. Wait 10 minutes or ask a coach to reset your PIN.'); $('pinBack').onclick = () => { show('stepWho'); resolve(false); }; return; }
+    $('pinPad').innerHTML = [1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k => k === '' ? '<span></span>' : `<button class="main" style="margin:0;font-size:30px;background:var(--onyx)" data-k="${k}">${k}</button>`).join('');
+    $('pinPad').querySelectorAll('button').forEach(b => b.onclick = async () => {
+      const k = b.dataset.k; if (k === '⌫') { cur = cur.slice(0, -1); return draw(); }
+      if (cur.length >= 4) return; cur += k; draw(); if (cur.length < 4) return;
+      if (mode === 'new') { first = cur; cur = ''; mode = 'confirm'; return draw(); }
+      if (mode === 'confirm') {
+        if (cur !== first) { cur = ''; first = ''; mode = 'new'; return draw('Those didn\'t match. Pick your 4-digit PIN again.'); }
+        const r = await sb.rpc('set_member_pin', { p_member: String(m.id), p_pin: cur });
+        if (r.error) { cur = ''; return draw('Could not save the PIN. Try again.'); }
+        return resolve(true);
+      }
+      const r = await sb.rpc('check_member_pin', { p_member: String(m.id), p_pin: cur }); cur = '';
+      if (r.data === 'ok') return resolve(true);
+      if (r.data === 'locked') { $('pinPad').innerHTML = ''; return draw('Too many tries. Wait 10 minutes or ask a coach to reset your PIN.'); }
+      draw('Wrong PIN. Try again.');
+    });
+    $('pinBack').onclick = () => { show('stepWho'); $('search').value = ''; $('results').innerHTML = ''; resolve(false); };
+    show('stepPin'); draw();
+  });
+}
 
 // MY PROGRESS: every week they've logged, top set per lift week by week, weekly volume, PRs
 const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
