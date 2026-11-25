@@ -95,6 +95,7 @@ body{max-width:900px}
 .choose .ex{margin:8px 0}
 .chz{font-family:'Bebas Neue';color:var(--fg);font-size:22px;letter-spacing:.08em}
 .or{font-family:'Mr Dafoe';font-weight:400;color:var(--fg);font-size:32px;text-align:center;line-height:1}
+.weekSel{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 .slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
 <body>
@@ -153,13 +154,34 @@ const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
 function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
 let SLOTS = [];
-async function sessionRows(cols){
+async function baseRows(cols){
   const { data: all } = await sb.from('day_sessions').select('slot');
   SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
   const p = pickedSlot();
   if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
   return sb.from('todays_session').select(cols || '*').order('item_order');
 }
+// ===== PROGRAM WEEK: defaults to this week; pick another week of the same block (kept on this device for today)
+let WEEKS = [], baseWeek = null;
+const todayKey = () => new Date().toLocaleDateString('en-CA');
+function pickedWeek(){ try { const v = JSON.parse(localStorage.getItem('empwrWeek') || 'null'); if (v && v.day === todayKey()) return v.week; } catch (e) {} return null; }
+function pickWeek(w){ try { localStorage.setItem('empwrWeek', JSON.stringify({ week: w, day: todayKey() })); } catch (e) {} }
+async function sessionRows(cols){ const res = await baseRows(); const rows = res.data || [];
+  if (!rows.length) return res; baseWeek = rows[0].week;
+  try {
+    const { data: cur } = await sb.from('program_sessions').select('id,block_id,day,slot,week').eq('id', rows[0].session_id).single();
+    if (!cur) return res;
+    const { data: sib } = await sb.from('program_sessions').select('id,week,title,day,slot').eq('block_id', cur.block_id).eq('day', cur.day).eq('slot', cur.slot).order('week');
+    WEEKS = [...new Set((sib || []).map(s => s.week))];
+    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w); if (!tgt) return res;
+    const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order');
+    const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
+    const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
+    const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
+    return { data: (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
+      exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })) };
+  } catch (e) { return res; } }
+const weekSel = w => WEEKS.length > 1 ? `<select class="weekSel" title="Which week of the program?">${WEEKS.map(x => `<option value="${x}"${x === w ? ' selected' : ''}>Week ${x}</option>`).join('')}</select>` : `Week ${w}`;
 const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
 const slotBtn = s => SLOTS.length > 1 ? `<button class="slotBtn" title="Tap to switch class">${fmtSlot(s)} ▸</button>` : fmtSlot(s);
 
@@ -308,13 +330,14 @@ $('readyBtn').onclick = async () => {
 };
 
 // STEP 3
+document.addEventListener('change', e => { const sel = e.target.closest('.weekSel'); if (!sel || !items.length) return; pickWeek(+sel.value); loadSession(); });
 document.addEventListener('click', e => { if (!e.target.closest('.slotBtn') || !items.length) return; pickSlot(nextSlot(items[0].slot)); loadSession(); });
 async function loadSession(){
   const { data } = await sessionRows();
   items = data || [];
   if (!items.length) { $('exList').innerHTML = '<div class="card">No session programmed for today.</div>'; show('stepSession'); return; }
   $('sessTitle').textContent = items[0].title || "Today's Lift";
-  $('sessSub').innerHTML = `Week ${items[0].week}, ${items[0].day} · ${slotBtn(items[0].slot)}`;
+  $('sessSub').innerHTML = `${weekSel(items[0].week)}, ${items[0].day} · ${slotBtn(items[0].slot)}`;
   $('badge').textContent = rule.label; $('badge').className = 'badge ' + rule.label;
   $('guidance').textContent = rule.guidance;
 
@@ -338,7 +361,7 @@ async function loadSession(){
   lastNote = {}; { const { data: wls } = await sb.from('workout_logs').select('notes,created_at').eq('member_id',member.id).order('created_at',{ascending:false}).limit(40);
     (wls||[]).forEach(w => { let x; try { x = JSON.parse(w.notes||'{}'); } catch(e) { return; } ((x && x.notes)||[]).forEach(n => { if (n.exercise_id && !(n.exercise_id in lastNote)) lastNote[n.exercise_id] = n.note; }); }); }
   // heaviest weight logged in Week 1 of this block (for 'MAX @ wk 1 wt' weeks)
-  wk1Max = {}; { const d0 = new Date(); d0.setHours(0,0,0,0); d0.setDate(d0.getDate() - ((d0.getDay()+6)%7) - 7*((items[0].week||1)-1)); const d1 = new Date(d0); d1.setDate(d1.getDate()+7);
+  wk1Max = {}; { const d0 = new Date(); d0.setHours(0,0,0,0); d0.setDate(d0.getDate() - ((d0.getDay()+6)%7) - 7*((baseWeek||items[0].week||1)-1)); const d1 = new Date(d0); d1.setDate(d1.getDate()+7);
     (hist||[]).forEach(r => { const t = new Date(r.created_at); if (t >= d0 && t < d1) wk1Max[r.exercise_id] = Math.max(wk1Max[r.exercise_id]||0, +r.weight); }); }
   const { data: pr } = await sb.from('personal_records').select('*').eq('member_id',member.id).in('exercise_id',ids);
   (pr||[]).forEach(r => { (prs[r.exercise_id] ||= {})[r.pr_type] = r.value; });

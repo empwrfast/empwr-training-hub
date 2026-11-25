@@ -77,6 +77,7 @@ button{font:inherit;cursor:pointer}
 #bar .in{max-width:1000px;margin:auto}
 .res{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
 .ok{color:#2FA84F;font-weight:800}.bad{color:var(--red);font-weight:800}
+.weekSel{font:inherit;color:#fff;background:var(--ink);border-radius:6px;padding:3px 6px;border:0;cursor:pointer;letter-spacing:inherit}
 .slotSel{font:inherit;color:#fff;background:var(--ink);border:0;border-radius:6px;padding:3px 6px;cursor:pointer;letter-spacing:inherit}
 .slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
@@ -123,7 +124,7 @@ const fmtSlot = s => { if (!s) return ''; if (s === 'open') return 'Open Gym'; c
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
 function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
 let SLOTS = [];
-async function sessionRows(cols){
+async function baseRows(cols){
   const { data: all } = await sb.from('day_sessions').select('slot');
   SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
   const p = pickedSlot();
@@ -131,6 +132,27 @@ async function sessionRows(cols){
   if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
   return sb.from('todays_session').select(cols || '*').order('item_order');
 }
+// ===== PROGRAM WEEK: defaults to this week; pick another week of the same block (kept on this device for today)
+let WEEKS = [], baseWeek = null;
+const todayKey = () => new Date().toLocaleDateString('en-CA');
+function pickedWeek(){ try { const v = JSON.parse(localStorage.getItem('empwrWeek') || 'null'); if (v && v.day === todayKey()) return v.week; } catch (e) {} return null; }
+function pickWeek(w){ try { localStorage.setItem('empwrWeek', JSON.stringify({ week: w, day: todayKey() })); } catch (e) {} }
+async function sessionRows(cols){ const res = await baseRows(); const rows = res.data || [];
+  if (!rows.length) return res; baseWeek = rows[0].week;
+  try {
+    const { data: cur } = await sb.from('program_sessions').select('id,block_id,day,slot,week').eq('id', rows[0].session_id).single();
+    if (!cur) return res;
+    const { data: sib } = await sb.from('program_sessions').select('id,week,title,day,slot').eq('block_id', cur.block_id).eq('day', cur.day).eq('slot', cur.slot).order('week');
+    WEEKS = [...new Set((sib || []).map(s => s.week))];
+    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w); if (!tgt) return res;
+    const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order');
+    const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
+    const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
+    const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
+    return { data: (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
+      exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })) };
+  } catch (e) { return res; } }
+const weekSel = w => WEEKS.length > 1 ? `<select class="weekSel" title="Which week of the program?">${WEEKS.map(x => `<option value="${x}"${x === w ? ' selected' : ''}>Week ${x}</option>`).join('')}</select>` : `Week ${w}`;
 const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
 // pick the hour you're logging (today's class times) or Open Gym
 const slotBtn = s => `<select class="slotSel" title="Which class are you logging?">${[...SLOTS, 'open'].map(x => `<option value="${x}"${x === s ? ' selected' : ''}>${fmtSlot(x)}</option>`).join('')}</select>`;
@@ -162,9 +184,12 @@ let curSlot = null;
 document.addEventListener('change', async e => { const sel = e.target.closest('.slotSel'); if (!sel) return; const nx = sel.value;
   if (items.length && !confirm('Switch to ' + (nx === 'open' ? 'Open Gym' : 'the ' + fmtSlot(nx) + ' class') + '? Numbers you have not saved will be cleared.')) { sel.value = curSlot; return; }
   pickSlot(nx); const { data } = await sessionRows('title,week,slot'); if (data && data[0]) setHeader(data[0]); if (items.length) load(); });
+document.addEventListener('change', async e => { const sel = e.target.closest('.weekSel'); if (!sel) return; const w = +sel.value;
+  if (items.length && !confirm('Switch to Week ' + w + '? Numbers you have not saved will be cleared.')) { sel.value = (items[0] || {}).week; return; }
+  pickWeek(w); const { data } = await sessionRows(); if (data && data[0]) setHeader(data[0]); if (items.length) load(); });
 function setHeader(r){ const t = (r.title || '').trim(), ph = (t.match(/\[\s*(phase\s*\d+)\s*\]/i) || [])[1] || '';
   $('phase').textContent = ph ? tc(ph.toUpperCase()).replace(/\s+/, ' ') : ''; $('aim').textContent = tc(t.split('--').pop().replace(/\[.*?\]/g, '').trim());
-  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · Week ${r.week} · ${slotBtn(pickedSlot() === 'open' ? 'open' : r.slot)}`; curSlot = pickedSlot() === 'open' ? 'open' : r.slot;
+  const d = new Date(); $('dt').innerHTML = `${d.toLocaleDateString('en-CA', { weekday: 'long' })} · ${d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')} · ${weekSel(r.week)} · ${slotBtn(pickedSlot() === 'open' ? 'open' : r.slot)}`; curSlot = pickedSlot() === 'open' ? 'open' : r.slot;
   const a = $('aim'), box = $('hdrT'); let f = 44; a.style.fontSize = f + 'px'; while (box.scrollWidth > box.clientWidth && f > 18) { f--; a.style.fontSize = f + 'px'; } }
 sessionRows('title,week,slot').then(({ data }) => { if (data && data[0]) setHeader(data[0]); });
 // who's here: everyone who checked in on the iPad today shows up on their own (tap ✕ to drop a no-show)
@@ -211,7 +236,7 @@ async function loadHist(memberIds){ const ids = [...new Set(items.flatMap(i => [
     if (!(k in wlOf)) wlOf[k] = r.workout_log_id;
     if (wlOf[k] === r.workout_log_id) ((last[r.member_id] ||= {})[r.exercise_id] ||= []).push(r); });
   memberIds.forEach(id => Object.values(last[id] || {}).forEach(a => a.sort((x, y) => x.set_number - y.set_number)));
-  const wk = (items[0] && items[0].week) || 1, d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - ((d0.getDay() + 6) % 7) - 7 * (wk - 1));
+  const wk = baseWeek || (items[0] && items[0].week) || 1, d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - ((d0.getDay() + 6) % 7) - 7 * (wk - 1));
   const d1 = new Date(d0); d1.setDate(d1.getDate() + 7);
   (hist || []).forEach(r => { const t = new Date(r.created_at); if (t >= d0 && t < d1) { const o = (wk1[r.member_id] ||= {}); o[r.exercise_id] = Math.max(o[r.exercise_id] || 0, +r.weight); } }); }
 // late arrival: search, then add their row under every exercise

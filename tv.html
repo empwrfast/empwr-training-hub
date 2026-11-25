@@ -126,6 +126,7 @@ aside{gap:1.4vh}
 .wusec{gap:calc(.8vh*var(--k,1))}
 .coachnote{font-size:calc(2.6vh*var(--k,1))}
 .lift .note{white-space:normal;line-height:1.25;font-size:2.4vh}
+.weekSel{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 .slotBtn{font:inherit;color:inherit;background:none;border:0;border-bottom:2px dotted currentColor;padding:0;cursor:pointer;letter-spacing:inherit}
 </style></head>
 <body>
@@ -159,13 +160,34 @@ const fmtSlot = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number
 function pickedSlot(){ try { const v = JSON.parse(localStorage.getItem('empwrSlot') || 'null'); if (v && v.until > Date.now()) return v.slot; } catch (e) {} return null; }
 function pickSlot(s){ try { localStorage.setItem('empwrSlot', JSON.stringify({ slot: s, until: Date.now() + 75 * 60000 })); } catch (e) {} }
 let SLOTS = [];
-async function sessionRows(cols){
+async function baseRows(cols){
   const { data: all } = await sb.from('day_sessions').select('slot');
   SLOTS = [...new Set((all || []).map(r => r.slot))].sort();
   const p = pickedSlot();
   if (p && SLOTS.includes(p)) return sb.from('day_sessions').select(cols || '*').eq('slot', p).order('item_order');
   return sb.from('todays_session').select(cols || '*').order('item_order');
 }
+// ===== PROGRAM WEEK: defaults to this week; pick another week of the same block (kept on this device for today)
+let WEEKS = [], baseWeek = null;
+const todayKey = () => new Date().toLocaleDateString('en-CA');
+function pickedWeek(){ try { const v = JSON.parse(localStorage.getItem('empwrWeek') || 'null'); if (v && v.day === todayKey()) return v.week; } catch (e) {} return null; }
+function pickWeek(w){ try { localStorage.setItem('empwrWeek', JSON.stringify({ week: w, day: todayKey() })); } catch (e) {} }
+async function sessionRows(cols){ const res = await baseRows(); const rows = res.data || [];
+  if (!rows.length) return res; baseWeek = rows[0].week;
+  try {
+    const { data: cur } = await sb.from('program_sessions').select('id,block_id,day,slot,week').eq('id', rows[0].session_id).single();
+    if (!cur) return res;
+    const { data: sib } = await sb.from('program_sessions').select('id,week,title,day,slot').eq('block_id', cur.block_id).eq('day', cur.day).eq('slot', cur.slot).order('week');
+    WEEKS = [...new Set((sib || []).map(s => s.week))];
+    const w = pickedWeek(), tgt = w && w !== cur.week && (sib || []).find(s => s.week === w); if (!tgt) return res;
+    const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order');
+    const ids = [...new Set((pi || []).map(x => x.exercise_id).filter(Boolean))];
+    const { data: ex } = ids.length ? await sb.from('exercises').select('id,name,video_url').in('id', ids) : { data: [] };
+    const by = Object.fromEntries((ex || []).map(e => [e.id, e]));
+    return { data: (pi || []).map(x => ({ session_id: tgt.id, title: tgt.title, week: tgt.week, day: tgt.day, slot: rows[0].slot, item_order: x.item_order,
+      exercise: (by[x.exercise_id] || {}).name ?? null, sets: x.sets, reps: x.reps, tempo: x.tempo, rest: x.rest, intensity: x.intensity, video_url: (by[x.exercise_id] || {}).video_url ?? null })) };
+  } catch (e) { return res; } }
+const weekSel = w => WEEKS.length > 1 ? `<select class="weekSel" title="Which week of the program?">${WEEKS.map(x => `<option value="${x}"${x === w ? ' selected' : ''}>Week ${x}</option>`).join('')}</select>` : `Week ${w}`;
 const nextSlot = cur => SLOTS.length ? SLOTS[(SLOTS.indexOf(cur) + 1) % SLOTS.length] : cur;
 const slotBtn = s => SLOTS.length > 1 ? `<button class="slotBtn" title="Tap to switch class">${fmtSlot(s)} ▸</button>` : fmtSlot(s);
 
@@ -190,7 +212,7 @@ function setHeader(s){
   const d = new Date();
   const dayName = d.toLocaleDateString('en-CA',{weekday:'long'});
   const md = d.toLocaleDateString('en-CA',{month:'short',day:'numeric'}).replace(/\./g,'');
-  document.getElementById('dt').innerHTML = `${dayName} · ${md} · Week ${s.week} · ${slotBtn(s.slot)}`;
+  document.getElementById('dt').innerHTML = `${dayName} · ${md} · ${weekSel(s.week)} · ${slotBtn(s.slot)}`;
   fitAim();
 }
 function fitAim(){
@@ -269,6 +291,7 @@ function fitLifts(){ const L = document.getElementById('lifts'); if (!L || L.que
   while (L.scrollHeight > L.clientHeight + 1 && z > 0.5) { z -= 0.03; set(z.toFixed(2)); } }
 if (document.fonts) document.fonts.ready.then(() => fitLifts());
 function go(dir){ if(!pages.length) return; pageIdx = (pageIdx + dir + pages.length) % pages.length; draw(); }
+document.addEventListener('change', e=>{ const sel = e.target.closest('.weekSel'); if (!sel) return; pickWeek(+sel.value); pageIdx = 0; loadSession(); });
 document.addEventListener('click', e=>{ if (!e.target.closest('.slotBtn')) return; pickSlot(nextSlot(curSlot)); pageIdx = 0; loadSession(); });
 document.addEventListener('keydown', e=>{
   if (e.key==='s' || e.key==='S'){ pickSlot(nextSlot(curSlot)); pageIdx = 0; loadSession(); return; }
