@@ -43,6 +43,11 @@ button{font:inherit;cursor:pointer}
 .who{font-weight:800;font-size:15px}
 .who small{display:block;font-weight:400;font-size:12px;color:var(--mute);margin-top:3px}
 .sets{display:flex;flex-wrap:wrap;gap:8px}
+.wus{display:flex;flex-wrap:wrap;gap:8px}.wus:not(:empty){margin-bottom:8px}
+.wst{display:flex;align-items:center;gap:4px;background:#fff;border:1px dashed var(--mute);border-radius:10px;padding:4px 6px}
+.wst span{font-family:'Bebas Neue';font-size:15px;color:var(--mute);letter-spacing:.03em}
+.wst input{width:62px;padding:7px 5px;font-size:15px;text-align:center;border:0;background:var(--card)}.wst input[data-wr]{width:48px}.wst i{font-style:normal;color:var(--mute)}
+.addwu{border:1px dashed var(--mute);background:#fff;color:var(--ink);border-radius:10px;padding:0 12px;font-weight:700;font-size:13px}
 .st{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 6px}
 .st span{font-family:'Bebas Neue';font-size:18px;color:var(--mute);width:16px;text-align:center}
 .st input{width:70px;padding:8px 6px;font-size:17px;text-align:center;border:0;background:var(--card)}
@@ -215,6 +220,10 @@ const modeOf = (it, oi) => { const o = optsOf(it); if (o) return o[oi || 0] || o
   return { sides: /EACH SIDE/i.test(x) && MIXED.test(x), bw: CHIN.test(x) }; };
 const exIdOf = (it, oi) => { const o = optsOf(it); return (o && (o[oi || 0] || {}).id) || it.exercise_id; };
 const lastTxt = (L, bw) => L ? 'Last: ' + L.map(x => `${bw ? (+x.weight ? 'BW+' + +x.weight : 'BW') : +x.weight ? +x.weight : 'BW'}×${x.reps}`).join(', ') : 'No history yet';
+// warm-up sets: main lifts only (Resistance block). Saved with the workout, not counted in volume or PRs (same as the iPad)
+const isRes = it => /^RESISTANCE/i.test((it.intensity || '').trim());
+const wuBox = (n, w = '', r = '') => `<div class="wst"><span>WU ${n}</span><input type="number" inputmode="decimal" placeholder="lb" value="${w}" data-ww><i>×</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-wr><i class="xw" title="Remove warm-up set" style="cursor:pointer;font-weight:800;padding-left:4px">✕</i></div>`;
+const addWu = (row, w, r) => { const box = row.querySelector('.wus'); if (box) box.insertAdjacentHTML('beforeend', wuBox(box.children.length + 1, w, r)); };
 const noteBox = v => `<input class="cnote" placeholder="Note: anything they did differently (optional)" maxlength="160" value="${esc(v || '')}" data-cn>`;
 const setBox = (s, w, r, md = {}) => `<div class="st"><span>${s}</span>${md.bw ? '<i class="bw" title="Bodyweight. Type the added weight only, if any">BW +</i>' : ''}<input type="number" inputmode="decimal" placeholder="${w || (md.bw ? '0' : 'lb')}" data-w title="${md.bw ? 'Added lb on top of bodyweight. Leave blank for bodyweight' : 'Weight (lb)'}"><i>×</i>${md.sides
   ? `<i>L</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r><i>R</i><input type="number" inputmode="numeric" placeholder="reps" value="${r}" data-r2>`
@@ -227,7 +236,7 @@ function rowHtml(p, it, oi = 0){ const n = Math.max(1, it.sets || 3), md = modeO
   const rAt = s => md.bw ? '' : !mx ? r : s < n - 1 ? ((L && (L[s] || L[L.length - 1]) || {}).reps || MAX_BASE) : '';
   const box = s => setBox(s + 1, w(s), rAt(s), md).replace(mx && s === n - 1 ? /placeholder="reps"/g : /$^/, `placeholder="${rg[0]}-${rg[1]}" data-min="${rg[0]}"`);
   return `<div class="mrow" data-m="${p.id}" data-o="${oi}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.<small>${lastTxt(L, md.bw)}</small></div>
-    <div>${o ? `<div class="pills opt">${o.map((x, i) => `<button data-o="${i}" class="${i === oi ? 'on' : ''}">${esc(x.label)}</button>`).join('')}</div>` : ''}<div class="sets">${Array.from({ length: n }, (_, s) => box(s)).join('')}<button class="plus" title="Add a set">+</button>${L ? '<button class="same">Same As Last</button>' : ''}<button class="fillr" title="Copy set 1 to the rest of this person's sets">Apply To All Sets ↓</button><button class="mod">✎ Modify</button></div><div class="mtot"></div>${noteBox()}</div></div>`; }
+    <div>${o ? `<div class="pills opt">${o.map((x, i) => `<button data-o="${i}" class="${i === oi ? 'on' : ''}">${esc(x.label)}</button>`).join('')}</div>` : ''}${isRes(it) ? '<div class="wus"></div>' : ''}<div class="sets">${Array.from({ length: n }, (_, s) => box(s)).join('')}<button class="plus" title="Add a set">+</button>${isRes(it) ? '<button class="addwu" title="Add a warm-up set (not counted in volume or PRs)">+ Warm-Up Set</button>' : ''}${L ? '<button class="same">Same As Last</button>' : ''}<button class="fillr" title="Copy set 1 to the rest of this person's sets">Apply To All Sets ↓</button><button class="mod">✎ Modify</button></div><div class="mtot"></div>${noteBox()}</div></div>`; }
 async function loadHist(memberIds){ const ids = [...new Set(items.flatMap(i => [i.exercise_id, ...(optsOf(i) || []).map(o => o.id)]).filter(Boolean))]; if (!ids.length || !memberIds.length) return;
   const { data: hist } = await sb.from('set_logs').select('member_id,exercise_id,set_number,weight,reps,workout_log_id,created_at')
     .in('member_id', memberIds).in('exercise_id', ids).order('created_at', { ascending: false }).limit(3000);
@@ -360,6 +369,9 @@ $('board').addEventListener('click', e => { const b = e.target.closest('.fille')
   const sst = src.querySelectorAll('.st');
   rows.forEach(r => { if (r === src || r.dataset.o !== src.dataset.o || !!r._mod !== !!src._mod) return;
     r.querySelectorAll('.st').forEach((x, i) => fillSt(sst[i] || sst[sst.length - 1], x)); }); totals(); });
+// warm-up sets: add / remove
+$('board').addEventListener('click', e => { const b = e.target.closest('.addwu'); if (b) { addWu(b.closest('.mrow')); const w = b.closest('.mrow').querySelectorAll('.wst [data-ww]'); w[w.length - 1].focus(); return; }
+  const x = e.target.closest('.xw'); if (!x) return; const box = x.closest('.wus'); x.closest('.wst').remove(); box.querySelectorAll('.wst span').forEach((s, i) => s.textContent = 'WU ' + (i + 1)); });
 // remove a set (added by accident, or they did fewer)
 $('board').addEventListener('click', e => { const x = e.target.closest('.xs'); if (!x) return; const sets = x.closest('.sets');
   x.closest('.st').remove(); sets.querySelectorAll('.st > span').forEach((s, i) => s.textContent = i + 1); totals(); });
@@ -367,7 +379,8 @@ $('board').addEventListener('click', e => { const x = e.target.closest('.xs'); i
 $('board').addEventListener('click', e => { const b = e.target.closest('.opt button'); if (!b) return; const row = b.closest('.mrow');
   const it = items[+row.closest('.ex').dataset.idx], p = picked.find(x => x.id === row.dataset.m); if (!p) return;
   const nv = (row.querySelector('[data-cn]') || {}).value; const t = document.createElement('div'); t.innerHTML = rowHtml(p, it, +b.dataset.o);
-  const nr = t.firstElementChild; if (nv) nr.querySelector('[data-cn]').value = nv; row.replaceWith(nr); totals(); });
+  const wv = [...row.querySelectorAll('.wst')].map(x => [x.querySelector('[data-ww]').value, x.querySelector('[data-wr]').value]);
+  const nr = t.firstElementChild; if (nv) nr.querySelector('[data-cn]').value = nv; wv.forEach(([w, r]) => addWu(nr, w, r)); row.replaceWith(nr); totals(); });
 $('board').addEventListener('input', totals);
 
 // pounds moved per member per exercise
@@ -470,6 +483,8 @@ $('saveAll').onclick = async () => {
       const reps = r2el ? (r && r2 ? Math.min(r, r2) : r || r2) : r;
       P.sets.push({ exercise_id: exId, set_number: ++n, weight: w, reps, st }); P.lb += w * (r + r2) * (r2el ? 1 : m);
       if (r2el) (P.sides ||= []).push({ exercise_id: exId, set: n, left: r || null, right: r2 || null }); });
+      row.querySelectorAll('.wst').forEach((x, i) => { const w = parseFloat(x.querySelector('[data-ww]').value), r = parseInt(x.querySelector('[data-wr]').value);
+        if (w || r) (P.wu ||= []).push({ exercise_id: exId, exercise: opt ? opt.name : it.exercise, set: i + 1, weight: w || null, reps: r || null }); });
       if (opt && n) (P.choices ||= []).push({ exercise_id: it.exercise_id, exercise: it.exercise, chose: opt.label });
       if (md) { const alt = md.alt && LIB.find(e => e.id === md.alt);
         (P.mods ||= []).push({ exercise_id: it.exercise_id, exercise: it.exercise, swapped_to_id: md.alt || null, swapped_to: alt ? alt.name : null,
@@ -483,14 +498,14 @@ $('saveAll').onclick = async () => {
     (per[r.dataset.m].cn ||= []).push({ exercise_id: (alt && alt.id) || exIdOf(it, +r.dataset.o || 0), exercise: alt ? alt.name : opt ? opt.label : it.exercise, note: v }); }); });
   // save again any time: new sets get added to the same workout, changed ones get updated, nothing doubles up
   const sig = x => `${x.weight}|${x.reps}`;
-  const isNew = p => !WL[p.id] || per[p.id].sets.some(x => !x.st.dataset.sid || x.st.dataset.sv !== sig(x)) || per[p.id].cardio.length || (per[p.id].cn || []).length || (per[p.id].mods || []).length;
-  const todo = picked.filter(p => (per[p.id].sets.length || per[p.id].cardio.length || (per[p.id].cn || []).length || (per[p.id].mods || []).length) && isNew(p));
+  const isNew = p => !WL[p.id] || per[p.id].sets.some(x => !x.st.dataset.sid || x.st.dataset.sv !== sig(x)) || per[p.id].cardio.length || (per[p.id].cn || []).length || (per[p.id].wu || []).length || (per[p.id].mods || []).length;
+  const todo = picked.filter(p => (per[p.id].sets.length || per[p.id].cardio.length || (per[p.id].cn || []).length || (per[p.id].wu || []).length || (per[p.id].mods || []).length) && isNew(p));
   if (!todo.length) { alert(Object.keys(WL).length ? 'Everything is already saved.' : 'Nothing to save yet. Enter at least one set.'); return; }
   if (!confirm(`Save for ${todo.map(p => p.name.split(' ')[0]).join(', ')}?`)) return;
   $('saveAll').disabled = true; $('saveAll').textContent = 'Saving...';
   const out = [];
   for (const p of todo) { const P = per[p.id];
-    const notes = JSON.stringify({ source: 'coach board', session_time: fmtSlot(curSlot), cardio: P.cardio, coach_notes: P.cn || [], mods: P.mods || [], notes: P.notes || [], choices: P.choices || [], sides: P.sides || [] });
+    const notes = JSON.stringify({ source: 'coach board', session_time: fmtSlot(curSlot), cardio: P.cardio, warmup_sets: P.wu || [], coach_notes: P.cn || [], mods: P.mods || [], notes: P.notes || [], choices: P.choices || [], sides: P.sides || [] });
     if (!WL[p.id]) { const { data: wl, error } = await sb.from('workout_logs').insert({ member_id: p.id, session_id: items[0].session_id, entered_by: 'coach', notes }).select().single();
       if (error) { out.push(`<div class="res"><span>${p.name}</span><span class="bad">Not saved, try again</span></div>`); continue; } WL[p.id] = wl.id; }
     else await sb.from('workout_logs').update({ notes }).eq('id', WL[p.id]);
@@ -516,6 +531,7 @@ function saveDraft(now){ if (restoring || !items.length) return; clearTimeout(dr
   const rows = {}, crows = {};
   document.querySelectorAll('.ex').forEach(card => { const idx = card.dataset.idx;
     card.querySelectorAll('.mrow:not(.crow)').forEach(r => { rows[idx + '|' + r.dataset.m] = { o: +r.dataset.o || 0, mod: r._mod || null, cn: (r.querySelector('[data-cn]') || {}).value || '',
+      wu: [...r.querySelectorAll('.wst')].map(x => [x.querySelector('[data-ww]').value, x.querySelector('[data-wr]').value]),
       sets: [...r.querySelectorAll('.st')].map(st => [(st.querySelector('[data-w]') || {}).value || '', (st.querySelector('[data-r]') || {}).value || '', (st.querySelector('[data-r2]') || {}).value || '', st.dataset.sid || '', st.dataset.sv || '']) }; });
     card.querySelectorAll('.crow').forEach(r => { const o = {}; r.querySelectorAll('[data-c]').forEach(f => o[f.dataset.c] = f.value); o.cn = (r.querySelector('[data-cn]') || {}).value || ''; crows[idx + '|' + r.dataset.m] = o; }); });
   try { localStorage.setItem(DKEY, JSON.stringify({ day: today(), slot: curSlot, picked, wl: WL, rows, crows, t: Date.now() })); } catch (e) {}
@@ -537,7 +553,8 @@ async function applyDraft(d){ restoring = true; WL = d.wl || {};
     sets.querySelectorAll('.st').forEach((x, i) => { const [w, r, r2, sid, sv] = v.sets[i] || []; const W = x.querySelector('[data-w]'), R = x.querySelector('[data-r]'), R2 = x.querySelector('[data-r2]');
       if (W) W.value = w || ''; if (R) R.value = r || ''; if (R2) R2.value = r2 || ''; x.querySelector('span').textContent = i + 1;
       if (sid) { x.dataset.sid = sid; x.dataset.sv = sv; x.classList.add('saved'); } });
-    if (v.cn) row.querySelector('[data-cn]').value = v.cn; }
+    if (v.cn) row.querySelector('[data-cn]').value = v.cn;
+    (v.wu || []).forEach(([w, r]) => addWu(row, w, r)); }
   for (const [k, v] of Object.entries(d.crows || {})) { const [idx, mid] = k.split('|'), r = document.querySelector(`.ex[data-idx="${idx}"] .crow[data-m="${mid}"]`); if (!r) continue;
     if (v.cn) r.querySelector('[data-cn]').value = v.cn;
     r.querySelectorAll('[data-c]').forEach(f => { if (v[f.dataset.c] != null && v[f.dataset.c] !== '') f.value = v[f.dataset.c]; }); }
