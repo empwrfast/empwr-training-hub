@@ -188,7 +188,22 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
     if (tgt) { const { data: pi } = await sb.from('program_items').select('*').eq('session_id', tgt.id).order('item_order'); rows = await toRows(pi, tgt); }
     // Resiliency "choose #1-6": the sheet puts option 1 on the Wk 2 row, option 2 on Wk 3, etc., so the sync spreads them across weeks.
     // Pull every numbered option for this class from all weeks of the block and show them all, every week.
-    const { data: rp } = await sb.from('program_items').select('*').in('session_id', (sib || []).map(s => s.id)).ilike('intensity', 'RESILIENCY%').order('item_order');
+    const { data: allp } = await sb.from('program_items').select('*').in('session_id', (sib || []).map(s => s.id)).order('item_order');
+    const wkOf = Object.fromEntries((sib || []).map(s => [s.id, s.week])), W = rows[0].week;
+    // Lifts with options (A1) etc.): the sheet's Wk 2 / Wk 3 / Wk 4 rows can carry an option exercise, so the sync puts that week's reps
+    // on the option and leaves the main lift on its Wk 1 reps. Use that week's reps for the whole group and offer every option every week.
+    const LBL = /^[A-Z]\d\)$/, key = r => (r.intensity || '').trim() + '|' + (r.tempo || '').trim();
+    for (const k of [...new Set(rows.filter(r => LBL.test((r.tempo || '').trim()) && !/^RESILIENCY/i.test((r.intensity || '').trim())).map(key))]) {
+      const grp = (allp || []).filter(x => key(x) === k && x.exercise_id); if (grp.length < 2) continue;
+      const wr = grp.find(x => wkOf[x.session_id] === W && !x.sets && (x.reps || '').replace(/[|\s]/g, ''));
+      const inRows = rows.filter(r => key(r) === k), main = inRows.find(r => r.sets) || inRows[0]; if (!main) continue;
+      if (wr) inRows.forEach(r => { r.reps = wr.reps; });
+      const have = new Set(inRows.map(r => r.exercise)), extra = [];
+      for (const x of grp) { if (x.sets || extra.some(e => e.exercise_id === x.exercise_id)) continue; extra.push({ ...x, sets: null, reps: wr ? wr.reps : main.reps, item_order: main.item_order }); }
+      const me2 = (sib || []).find(s => s.week === W) || { id: rows[0].session_id, title: rows[0].title, week: W, day: rows[0].day };
+      const add = (await toRows(extra, me2)).filter(r => !have.has(r.exercise)).map(r => ({ ...r, intensity: main.intensity }));
+      if (add.length) { const last = rows.lastIndexOf(inRows[inRows.length - 1]); rows.splice(last + 1, 0, ...add); } }
+    const rp = (allp || []).filter(x => /^RESILIENCY/i.test((x.intensity || '').trim()));
     const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
     if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
       opts.sort((a, b) => (parseInt(a.tempo) || 99) - (parseInt(b.tempo) || 99));
