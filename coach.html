@@ -176,6 +176,11 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
       const me2 = (sib || []).find(s => s.week === W) || { id: rows[0].session_id, title: rows[0].title, week: W, day: rows[0].day };
       const add = (await toRows(extra, me2)).filter(r => !have.has(r.exercise)).map(r => ({ ...r, intensity: main.intensity }));
       if (add.length) { const last = rows.lastIndexOf(inRows[inRows.length - 1]); rows.splice(last + 1, 0, ...add); } }
+    // Final week "MAX @ wk 1 wt": programmed sets at last week's reps (e.g. 3 x 6), then 1 extra set for max reps, all at week 1 top weight
+    rows.forEach(r => { if (!/MAX/i.test(r.reps || '') || !/wk\s*1/i.test(r.reps || '') || r.max_base !== undefined) return;
+      const prev = (allp || []).filter(x => key(x) === key(r) && wkOf[x.session_id] === W - 1);
+      const pr = prev.find(x => !x.sets && (x.reps || '').replace(/[|\s]/g, '')) || prev.find(x => (x.reps || '').replace(/[|\s]/g, ''));
+      r.max_base = pr ? (parseInt(String(pr.reps).split('|').pop()) || null) : null; if (r.sets) r.sets = +r.sets + 1; });
     const rp = (allp || []).filter(x => /^RESILIENCY/i.test((x.intensity || '').trim()));
     const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
     if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
@@ -261,8 +266,8 @@ function rowHtml(p, it, oi = 0){ const n = Math.max(1, it.sets || 3), md = modeO
   const mx = isMax(it), W1 = (wk1[p.id] || {})[exIdOf(it, oi)];
   const w = s => { if (mx && W1) return W1; if (!L) return ''; const x = L[s] || L[L.length - 1]; return x && x.weight ? +x.weight : ''; };
   const r = md.bw ? '' : (parseInt(repsOf(it)) || '');
-  const base = mx && L && L[0] ? +L[0].reps : MAX_BASE, rg = maxRange(it, base);
-  const rAt = s => md.bw ? '' : !mx ? r : s < n - 1 ? ((L && (L[s] || L[L.length - 1]) || {}).reps || MAX_BASE) : '';
+  const base = mx ? (it.max_base || (L && L[0] ? +L[0].reps : MAX_BASE)) : MAX_BASE, rg = maxRange(it, base);
+  const rAt = s => md.bw ? '' : !mx ? r : s < n - 1 ? base : '';
   const box = s => setBox(s + 1, w(s), rAt(s), md).replace(mx && s === n - 1 ? /placeholder="reps"/g : /$^/, `placeholder="${rg[0]}-${rg[1]}" data-min="${rg[0]}"`);
   return `<div class="mrow" data-m="${p.id}" data-o="${oi}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.<small>${lastTxt(L, md.bw)}</small></div>
     <div>${o ? `<div class="pills opt">${o.map((x, i) => `<button data-o="${i}" class="${i === oi ? 'on' : ''}">${esc(x.label)}</button>`).join('')}</div>` : ''}${isRes(it) ? '<div class="wus"></div>' : ''}<div class="sets">${Array.from({ length: n }, (_, s) => box(s)).join('')}<button class="plus" title="Add a set">+</button>${isRes(it) ? '<button class="addwu" title="Add a warm-up set (not counted in volume or PRs)">+ Warm-Up Set</button>' : ''}${L ? '<button class="same">Same As Last</button>' : ''}<button class="fillr" title="Copy set 1 to the rest of this person's sets">Apply To All Sets ↓</button><button class="mod">✎ Modify</button></div><div class="mtot"></div>${noteBox()}</div></div>`; }
@@ -305,7 +310,7 @@ const maxRange = (it, base) => { const m = repsOf(it).match(/MAX\s*(\d+)\s*-\s*(
 const multOf = it => /\de\b/i.test(repsOf(it)) || (isMax(it) && UNI_RX.test(it.exercise || '')) ? 2 : 1;
 const volOf = (L, m) => (L || []).reduce((a, x) => a + (+x.weight || 0) * (+x.reps || 0), 0) * m;
 let wk1 = {};   // wk1[member][exercise] = top weight in week 1 of this block
-const schemeOf = it => it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets > 1 ? 's' : ''}`) : repsOf(it);
+const schemeOf = it => isMax(it) ? `${Math.max(1, (it.sets || 2) - 1)} x ${it.max_base || MAX_BASE}, 1 x MAX @ Wk 1 Top Weight` : it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets > 1 ? 's' : ''}`) : repsOf(it);
 const isCardio = it => /^RESILIENCY/i.test((it.intensity || '').trim()) && !!(it.exercise || '').trim();
 // default distance unit per machine at EMPWR
 const unitFor = n => /versa/i.test(n) ? 'ft' : /true\s*form/i.test(n) ? 'km' : /woodway|4\s*front/i.test(n) ? 'mi' : /echo|bike/i.test(n) ? 'mi' : /ski|row/i.test(n) ? 'm' : /treadmill/i.test(n) ? 'km' : 'm';
@@ -360,10 +365,10 @@ async function load(){
       cur = { raw, nm, q: tc((raw.match(/\[(.*?)\]/) || [])[1] || ''), idx: [] }; blocks.push(cur); }
     cur.idx.push(idx); });
 
-  const card = idx => { const it = items[idx], mult = multOf(it), rg = maxRange(it);
+  const card = idx => { const it = items[idx], mult = multOf(it), rg = maxRange(it, it.max_base);
     return `<div class="card ex" data-idx="${idx}" data-mult="${mult}">
       <div class="exhead">${isCardio(it) ? `<h3>Choose Your Machine <span style="font-family:Montserrat,sans-serif;font-size:15px;font-weight:600;color:var(--mute)">${esc(cardioTask(it.exercise))}</span></h3>` : `<h3><span class="lbl">${esc(it.tempo || '')}</span>${esc(it.exercise)}</h3><b>${esc(schemeOf(it))}</b>`}</div>
-      ${isMax(it) ? `<div class="rule">Week 1 Weight. ${it.sets > 1 ? `${it.sets === 2 ? 'Set 1' : it.sets === 3 ? 'Sets 1 + 2' : `Sets 1 to ${it.sets - 1}`}: Same Reps As Last Week. ` : ''}Set ${it.sets}: Max Reps (Min ${rg[0]}, Max ${rg[1]})${mult === 2 ? '. Each Side' : ''}.</div>` : ''}
+      ${isMax(it) ? `<div class="rule">Week 1 Top Weight. ${Math.max(1, (it.sets || 2) - 1)} x ${it.max_base || MAX_BASE}, Then 1 x Max Reps (Min ${rg[0]}, Max ${rg[1]})${mult === 2 ? '. Each Side' : ''}.</div>` : ''}
       ${picked.length > 1 ? '<button class="fille" title="Copy the first filled-in person to everyone (only empty boxes)">Apply To Everyone ↓</button>' : ''}
       ${picked.map(p => isCardio(it) ? cardioRow(p, it) : rowHtml(p, it)).join('')}
     </div>`; };

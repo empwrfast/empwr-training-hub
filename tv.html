@@ -203,6 +203,11 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
       const me2 = (sib || []).find(s => s.week === W) || { id: rows[0].session_id, title: rows[0].title, week: W, day: rows[0].day };
       const add = (await toRows(extra, me2)).filter(r => !have.has(r.exercise)).map(r => ({ ...r, intensity: main.intensity }));
       if (add.length) { const last = rows.lastIndexOf(inRows[inRows.length - 1]); rows.splice(last + 1, 0, ...add); } }
+    // Final week "MAX @ wk 1 wt": programmed sets at last week's reps (e.g. 3 x 6), then 1 extra set for max reps, all at week 1 top weight
+    rows.forEach(r => { if (!/MAX/i.test(r.reps || '') || !/wk\s*1/i.test(r.reps || '') || r.max_base !== undefined) return;
+      const prev = (allp || []).filter(x => key(x) === key(r) && wkOf[x.session_id] === W - 1);
+      const pr = prev.find(x => !x.sets && (x.reps || '').replace(/[|\s]/g, '')) || prev.find(x => (x.reps || '').replace(/[|\s]/g, ''));
+      r.max_base = pr ? (parseInt(String(pr.reps).split('|').pop()) || null) : null; if (r.sets) r.sets = +r.sets + 1; });
     const rp = (allp || []).filter(x => /^RESILIENCY/i.test((x.intensity || '').trim()));
     const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
     if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
@@ -226,6 +231,7 @@ t.onclick = () => { document.body.classList.toggle('dark');
 const pad = n => String(n).padStart(2,'0');
 const titleCase = s => s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s|&)(\w)/g,(m,a,b)=>a+b.toUpperCase()) : s;
 const scheme = r => { const reps = String(r.reps||'').split('|').pop().trim();
+  if (/MAX/i.test(reps) && /wk\s*1/i.test(reps)) return `${Math.max(1, (r.sets || 2) - 1)} x ${r.max_base || 6}, 1 x MAX @ Wk 1 Top Weight`;
   return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} set${r.sets>1?'s':''}`) : reps; };
 let pages = [], pageIdx = 0, sessionId = null, curSlot = null;
 
@@ -295,7 +301,8 @@ function draw(){
   const maxRule = it => { const r = String(it.reps||''); if (!/MAX/i.test(r) || !/wk\s*1/i.test(r)) return '';
     const rg = r.match(/MAX\s*(\d+)\s*-\s*(\d+)/i);
     const uni = /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|OVR\s*UNDER|MIXED|EACH SIDE/i.test(it.exercise) || /\d+e\b/i.test(r);
-    return `Use Your Top Week 1 Weight. Sets 1 + 2: Same Reps As Last Week. Set 3: Max Reps${rg ? ` (Min ${rg[1]}, Max ${rg[2]})` : ''}${uni ? '. One Side, Go Do The Rest, Then Come Back For The Other Side' : ''}.`; };
+    const lo = rg ? +rg[1] : Math.round((it.max_base || 6) * 1.5), hi = rg ? +rg[2] : lo + 2;
+    return `Use Your Week 1 Top Weight. ${Math.max(1, (it.sets || 2) - 1)} x ${it.max_base || 6}, Then 1 x Max Reps (Min ${lo}, Max ${hi})${uni ? '. One Side, Go Do The Rest, Then Come Back For The Other Side' : ''}.`; };
   const pg = pages[pageIdx];
   el.classList.toggle('many', pg.items.length > 6 && pg.nm !== 'RELEASE');
   el.innerHTML =
