@@ -210,9 +210,12 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
       const w1 = grp.filter(x => wkOf[x.session_id] === Math.min(...grp.map(y => wkOf[y.session_id]))), mainId = (w1.find(x => x.sets) || w1[0] || {}).exercise_id;
       const tail = v => String(v || '').split('|').pop().trim(); let S = main.sets, R = tail(main.reps);
       for (let w = 2; w <= W; w++) { const o = grp.find(x => wkOf[x.session_id] === w && x.exercise_id !== mainId); if (!o) continue; if (o.sets) S = o.sets; if (tail(o.reps)) R = tail(o.reps); }
-      inRows.forEach(r => { r.sets = S; r.reps = R; });
+      // each exercise can carry its own reps in its note (e.g. DEADLIFT x20, FLY x15e); otherwise the shared weekly reps
+      const { data: gx } = await sb.from('exercises').select('id,name').in('id', [...new Set(grp.map(x => x.exercise_id))]), idOf = Object.fromEntries((gx || []).map(e => [e.name, e.id]));
+      const own = id => { const n = String((grp.find(x => x.exercise_id === id && /^x\s*\d/i.test(x.coach_note || '')) || {}).coach_note || '').trim(); return n ? n.replace(/^x\s*/i, '') : ''; };
+      inRows.forEach(r => { r.sets = S; r.reps = own(idOf[r.exercise]) || R; });
       const have = new Set(inRows.map(r => r.exercise)), extra = [];
-      for (const x of grp) { if (x.exercise_id === mainId || extra.some(e => e.exercise_id === x.exercise_id)) continue; extra.push({ ...x, sets: S, reps: R, item_order: main.item_order }); }
+      for (const x of grp) { if (x.exercise_id === mainId || extra.some(e => e.exercise_id === x.exercise_id)) continue; extra.push({ ...x, sets: S, reps: own(x.exercise_id) || R, item_order: main.item_order }); }
       const me2 = (sib || []).find(s => s.week === W) || { id: rows[0].session_id, title: rows[0].title, week: W, day: rows[0].day };
       const add = (await toRows(extra, me2)).filter(r => !have.has(r.exercise)).map(r => ({ ...r, intensity: main.intensity }));
       if (add.length) { const last = rows.lastIndexOf(inRows[inRows.length - 1]); rows.splice(last + 1, 0, ...add); } }
