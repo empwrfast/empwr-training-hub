@@ -38,9 +38,15 @@ language sql stable security definer set search_path = '' as $$
   limit 1;
 $$;
 
+-- On/off switch for the one-time device sign-in on the iPad, Coach Board and TV.
+-- Starts OFF so the gym keeps running untouched while the portal is tested.
+create table if not exists sgpt.settings (key text primary key, value text);
+insert into sgpt.settings values ('device_signin', 'off') on conflict (key) do nothing;
+
 create or replace function sgpt.whoami() returns json
 language sql stable security definer set search_path = '' as $$
   select json_build_object(
+    'gate', coalesce((select value from sgpt.settings where key = 'device_signin'), 'off') = 'on',
     'staff', sgpt.is_staff(),
     'member', (select json_build_object('id', m.id, 'first_name', m.first_name,
                                         'last_name', m.last_name, 'plan', m.plan)
@@ -118,6 +124,8 @@ grant execute on function sgpt.is_staff(), sgpt.my_member_id(), sgpt.whoami(),
   sgpt.check_member_pin(text,text), sgpt.clear_member_pin(text) to authenticated;
 grant execute on function sgpt.whoami() to anon;
 grant select on sgpt.staff to authenticated;
+alter table sgpt.settings enable row level security;
+revoke all on sgpt.settings from anon, authenticated;
 alter table sgpt.staff enable row level security;
 drop policy if exists staff_read_self on sgpt.staff;
 create policy staff_read_self on sgpt.staff for select to authenticated using (sgpt.is_staff());
@@ -141,6 +149,7 @@ begin
            where n.nspname = 'sgpt' and c.relkind in ('r','p')
              and c.relname not in ('staff','member_pins')
   loop
+    continue when r.relname = 'settings';
     has_member := exists (select 1 from information_schema.columns
                           where table_schema = 'sgpt' and table_name = r.relname and column_name = 'member_id');
     execute format('drop policy if exists hub_staff_all on sgpt.%I', r.relname);

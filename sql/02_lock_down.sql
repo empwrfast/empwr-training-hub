@@ -33,6 +33,9 @@ begin
   end loop;
 end $$;
 
+-- Devices must sign in from now on
+update sgpt.settings set value = 'on' where key = 'device_signin';
+
 -- Check: every table should say rules_on = true
 select c.relname as name, c.relkind as kind, c.relrowsecurity as rules_on
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
