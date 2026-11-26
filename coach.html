@@ -470,7 +470,7 @@ function totals(){ document.querySelectorAll('.ex').forEach(card => { const m = 
 // ===== MODIFY (tool, swap, reps, why) =====
 let LIB = [], FAMS = [];
 const TOOLS = ['DB', 'KB', 'Straight Bar', 'SSB', 'Trap Bar', 'Cable', 'Machine', 'Landmine', 'Band', 'Bodyweight', 'Smith'];
-const WHY = ['Knee Pain', 'Low Back', 'Shoulder', 'Hip', 'Wrist / Elbow', 'Equipment Busy', 'Regression', 'Progression', 'Other'];
+const WHY = ['Knee Pain', 'Low Back', 'Shoulder', 'Hip', 'Wrist / Elbow', 'Equipment Busy', 'Did It Already', 'Regression', 'Progression', 'Other'];
 // knee pain: go hinge; low back: go single leg; everything else keeps the same pattern
 const WHY_FAM = { 'Knee Pain': 'Hinge', 'Low Back': 'Single Leg' };
 const UNI = /\b(SL|SA|SINGLE|1\s*-?\s*(ARM|LEG)|SPLIT|LUNGE|STEP|RFE|BULGARIAN|1\/2|HALF KNEEL|KNEELING|STAGGER|OFFSET|SUITCASE|EACH|ALT|ALTERNATING|PISTOL|SKATER|B\s*-?\s*STANCE|KICKSTAND|COPENHAGEN|UNILATERAL)\b/i;
