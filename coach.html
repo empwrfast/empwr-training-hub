@@ -36,7 +36,8 @@ button{font:inherit;cursor:pointer}
 .band .nm{font-family:'Bebas Neue';font-size:30px;letter-spacing:.04em}
 .band .q{font-family:'Mr Dafoe';font-size:28px;margin-left:12px}
 .ex{border-left:6px solid var(--line)}
-.exhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.exhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;position:sticky;top:var(--tabsH,62px);z-index:4;background:var(--card);padding:6px 0;margin:-6px 0 0}
+.lcs{margin-bottom:6px}.lcs button{font-size:12px}
 .exhead h3{font-family:'Bebas Neue';font-size:26px;letter-spacing:.03em}
 .exhead .lbl{color:var(--mute);margin-right:8px}
 .exhead b{font-family:'Bebas Neue';font-size:22px;white-space:nowrap}
@@ -271,6 +272,16 @@ function optsOf(it){ const raw = String((it && it.exercise) || ''); if (!/\s\/\s
     return { name: n, label: fixAb(chin && !/CHIN|PULL/i.test(n) ? 'Chin-Up ' + tc(n.replace(/\bOVR\b/i, 'OVER')) : tc(n)), id: e ? e.id : null, sides: each && MIXED.test(n), bw: chin }; }); }
 const modeOf = (it, oi) => { const o = optsOf(it); if (o) return o[oi || 0] || o[0]; const x = String((it && it.exercise) || '');
   return { sides: /EACH SIDE/i.test(x) && MIXED.test(x), bw: CHIN.test(x) }; };
+// leg curls: log the side and the platform
+const LC_PLAT = ['Rowing Machine', 'Slideboard', 'Gliders On Turf', 'Stability Ball'];
+const lcHtml = it => { const n = String((it && it.exercise) || ''); if (!/LEG\s*CURL/i.test(n)) return '';
+  const side = /\b1\s*-?\s*L(EG)?\b|SINGLE/i.test(n) ? 'Unilateral' : 'Bilateral', plat = /ROW/i.test(n) ? 'Rowing Machine' : /SLIDE/i.test(n) ? 'Slideboard' : /BALL/i.test(n) ? 'Stability Ball' : /GLIDER/i.test(n) ? 'Gliders On Turf' : '';
+  const g = (k, vs, on) => `<div class="pills lcs" data-g="${k}">${vs.map(v => `<button data-lc="${v}" class="${v === on ? 'on' : ''}">${v}</button>`).join('')}</div>`;
+  return g('side', ['Bilateral', 'Unilateral'], side) + g('plat', LC_PLAT, plat); };
+document.addEventListener('click', e => { const b = e.target.closest('.lcs button'); if (!b) return; b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+// keep the exercise name pinned under the section tabs while scrolling through people
+const tabsH = () => { const t = document.getElementById('tabs'); if (t) document.documentElement.style.setProperty('--tabsH', t.offsetHeight + 'px'); };
+addEventListener('resize', tabsH); setTimeout(tabsH, 500); document.addEventListener('click', () => setTimeout(tabsH, 50));
 const exIdOf = (it, oi) => { const o = optsOf(it); return (o && (o[oi || 0] || {}).id) || it.exercise_id; };
 const lastTxt = (L, bw) => L ? 'Last: ' + L.map(x => `${bw ? (+x.weight ? 'BW+' + +x.weight : 'BW') : +x.weight ? (isInertia(x.weight) ? wCombo(x.weight) : +x.weight) : 'BW'}×${x.reps}`).join(', ') : 'No history yet';
 // warm-up sets: main lifts only (Resistance block). Saved with the workout, not counted in volume or PRs (same as the iPad)
@@ -289,7 +300,7 @@ function rowHtml(p, it, oi = 0){ const n = Math.max(1, it.sets || 3), md = modeO
   const rAt = s => md.bw ? '' : !mx ? r : s < n - 1 ? base : '';
   const box = s => setBox(s + 1, w(s), rAt(s), md).replace(mx && s === n - 1 ? /placeholder="reps"/g : /$^/, it.max_30 ? 'placeholder="30s"' : `placeholder="${rg[0]}-${rg[1]}" data-min="${rg[0]}"`);
   return `<div class="mrow" data-m="${p.id}" data-o="${oi}"><div class="who">${esc(p.name.split(' ')[0])} ${esc(p.name.split(' ').slice(1).join(' ').slice(0,1))}.<small>${lastTxt(L, md.bw)}</small></div>
-    <div>${o ? `<div class="pills opt">${o.map((x, i) => `<button data-o="${i}" class="${i === oi ? 'on' : ''}">${esc(x.label)}</button>`).join('')}</div>` : ''}${isRes(it) ? '<div class="wus"></div>' : ''}<div class="sets">${Array.from({ length: n }, (_, s) => box(s)).join('')}<button class="plus" title="Add a set">+</button>${isRes(it) ? '<button class="addwu" title="Add a warm-up set (not counted in volume or PRs)">+ Warm-Up Set</button>' : ''}${L ? '<button class="same">Same As Last</button>' : ''}<button class="fillr" title="Copy set 1 to the rest of this person's sets">Apply To All Sets ↓</button><button class="mod">✎ Modify</button></div><div class="mtot"></div>${noteBox()}</div></div>`; }
+    <div>${o ? `<div class="pills opt">${o.map((x, i) => `<button data-o="${i}" class="${i === oi ? 'on' : ''}">${esc(x.label)}</button>`).join('')}</div>` : ''}${lcHtml(it)}${isRes(it) ? '<div class="wus"></div>' : ''}<div class="sets">${Array.from({ length: n }, (_, s) => box(s)).join('')}<button class="plus" title="Add a set">+</button>${isRes(it) ? '<button class="addwu" title="Add a warm-up set (not counted in volume or PRs)">+ Warm-Up Set</button>' : ''}${L ? '<button class="same">Same As Last</button>' : ''}<button class="fillr" title="Copy set 1 to the rest of this person's sets">Apply To All Sets ↓</button><button class="mod">✎ Modify</button></div><div class="mtot"></div>${noteBox()}</div></div>`; }
 async function loadHist(memberIds){ const ids = [...new Set(items.flatMap(i => [i.exercise_id, ...(optsOf(i) || []).map(o => o.id)]).filter(Boolean))]; if (!ids.length || !memberIds.length) return;
   const { data: hist } = await sb.from('set_logs').select('member_id,exercise_id,set_number,weight,reps,workout_log_id,created_at')
     .in('member_id', memberIds).in('exercise_id', ids).order('created_at', { ascending: false }).limit(3000);
@@ -558,12 +569,14 @@ $('saveAll').onclick = async () => {
       const exId = (md && md.alt) || exIdOf(it, oi), m = md ? (/\de\b/i.test(md.reps) ? 2 : 1) : (+card.dataset.mult || 1);
       let n = 0; row.querySelectorAll('.st').forEach(st => { const r2el = st.querySelector('[data-r2]');
       let w = wVal(st.querySelector('[data-w]')); const r = parseInt(st.querySelector('[data-r]').value) || 0, r2 = r2el ? parseInt(r2el.value) || 0 : 0;
-      if (!(r || r2) || !exId) return; if (!w) { if (!mx.bw) return; w = 0; }   // chin-ups: blank weight = bodyweight
+      if (!(r || r2) || !exId) return; if (!w) { if (!mx.bw && (st.querySelector('[data-w]').value || '').trim() !== '0') return; w = 0; }   // chin-ups: blank weight = bodyweight; 0 = bodyweight on anything
       const reps = r2el ? (r && r2 ? Math.min(r, r2) : r || r2) : r;
       P.sets.push({ exercise_id: exId, set_number: ++n, weight: w, reps, st }); if (!isInertia(w)) P.lb += w * (r + r2) * (r2el ? 1 : m);
       if (r2el) (P.sides ||= []).push({ exercise_id: exId, set: n, left: r || null, right: r2 || null }); });
       row.querySelectorAll('.wst').forEach((x, i) => { const w = parseFloat(x.querySelector('[data-ww]').value), r = parseInt(x.querySelector('[data-wr]').value);
         if (w || r) (P.wu ||= []).push({ exercise_id: exId, exercise: opt ? opt.name : it.exercise, set: i + 1, weight: w || null, reps: r || null }); });
+      const lcOn = [...row.querySelectorAll('.lcs .on')].map(x => x.dataset.lc);
+      if (lcOn.length && n) { (P.setup ||= []).push({ exercise_id: exId, exercise: it.exercise, setup: lcOn }); (P.notes ||= []).push({ exercise_id: exId, exercise: it.exercise, note: lcOn.join(' · ') }); }
       if (opt && n) (P.choices ||= []).push({ exercise_id: it.exercise_id, exercise: it.exercise, chose: opt.label });
       if (md) { const alt = md.alt && LIB.find(e => e.id === md.alt);
         (P.mods ||= []).push({ exercise_id: it.exercise_id, exercise: it.exercise, swapped_to_id: md.alt || null, swapped_to: alt ? alt.name : null,
@@ -584,7 +597,7 @@ $('saveAll').onclick = async () => {
   $('saveAll').disabled = true; $('saveAll').textContent = 'Saving...';
   const out = [];
   for (const p of todo) { const P = per[p.id];
-    const notes = JSON.stringify({ source: 'coach board', session_time: fmtSlot(curSlot), cardio: P.cardio, warmup_sets: P.wu || [], coach_notes: P.cn || [], mods: P.mods || [], notes: P.notes || [], choices: P.choices || [], sides: P.sides || [] });
+    const notes = JSON.stringify({ source: 'coach board', session_time: fmtSlot(curSlot), cardio: P.cardio, warmup_sets: P.wu || [], coach_notes: P.cn || [], mods: P.mods || [], notes: P.notes || [], choices: P.choices || [], sides: P.sides || [], setup: P.setup || [] });
     if (!WL[p.id]) { const { data: wl, error } = await sb.from('workout_logs').insert({ member_id: p.id, session_id: items[0].session_id, entered_by: 'coach', notes }).select().single();
       if (error) { out.push(`<div class="res"><span>${p.name}</span><span class="bad">Not saved, try again</span></div>`); continue; } WL[p.id] = wl.id; }
     else await sb.from('workout_logs').update({ notes }).eq('id', WL[p.id]);
@@ -662,7 +675,7 @@ $('pinRes').onclick = async e => { const b = e.target.closest('button'); if (!b)
 // done sets: once a set has reps plus a weight (or bodyweight, once touched) the box goes dark so it's clear it's logged
 function markDone(){ document.querySelectorAll('.st').forEach(b => { const w = b.querySelector('[data-w]'), r = b.querySelector('[data-r]'), r2 = b.querySelector('[data-r2]'); if (!w || !r) return;
   const reps = (parseInt(r.value) || 0) + (r2 ? parseInt(r2.value) || 0 : 0), bw = !!b.querySelector('.bw') || b.closest('.ex,.card')?.dataset.bw === '1';
-  b.classList.toggle('done', reps > 0 && (parseFloat(w.value) > 0 || /[A-Z]/.test(w.value) || (bw && b.dataset.t === '1'))); }); }
+  b.classList.toggle('done', reps > 0 && (parseFloat(w.value) > 0 || w.value.trim() === '0' || /[A-Z]/.test(w.value) || (bw && b.dataset.t === '1'))); }); }
 let mdT = 0; const mdQ = () => { cancelAnimationFrame(mdT); mdT = requestAnimationFrame(markDone); };
 document.addEventListener('input', e => { const b = e.target.closest('.st'); if (b) b.dataset.t = '1'; mdQ(); });
 document.addEventListener('click', mdQ); new MutationObserver(mdQ).observe(document.body, { childList: true, subtree: true });

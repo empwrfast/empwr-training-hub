@@ -573,7 +573,7 @@ $('saveBtn').onclick = async () => {
     const it = items[+card.dataset.idx], oi = +card.dataset.o || 0, md = modeOf(it, oi), exId = exIdOf(it, oi), opt = (optsOf(it) || [])[oi];
     let n = 0; card.querySelectorAll('.set').forEach(row=>{ const r2el = md.sides ? row.querySelector('[data-r2]') : null;
       let w = wVal(row.querySelector('[data-w]')); const r = parseInt(row.querySelector('[data-r]').value) || 0, r2 = r2el ? parseInt(r2el.value) || 0 : 0;
-      if (!(r || r2) || !exId) return; if (!w) { if (!md.bw) return; w = 0; }   // chin-ups: blank weight = bodyweight
+      if (!(r || r2) || !exId) return; if (!w) { if (!md.bw && (row.querySelector('[data-w]').value || '').trim() !== '0') return; w = 0; }   // chin-ups: blank weight = bodyweight; 0 = bodyweight on anything
       rows.push({member_id: member.id, exercise_id: exId, set_number: ++n, weight: w, reps: r2el ? (r && r2 ? Math.min(r, r2) : r || r2) : r});
       if (r2el) sides.push({exercise_id: exId, set: n, left: r || null, right: r2 || null}); });
     if (opt && n) choices.push({exercise_id: it.exercise_id, exercise: it.exercise, chose: opt.label});
@@ -600,7 +600,7 @@ $('saveBtn').onclick = async () => {
 // done sets: once the member touches a set (types, taps − / +, or Autofill) and it has reps plus a weight (or BW), the row goes dark so it's clear it's logged
 function markDone(){ document.querySelectorAll('.set').forEach(b => { const w = b.querySelector('[data-w]'), r = b.querySelector('[data-r]'), r2 = b.querySelector('[data-r2]'); if (!w || !r) return;
   const reps = (parseInt(r.value) || 0) + (r2 ? parseInt(r2.value) || 0 : 0);
-  b.classList.toggle('done', b.dataset.t === '1' && reps > 0 && (parseFloat(w.value) > 0 || /[A-Z]/.test(w.value) || w.placeholder === 'BW')); }); }
+  b.classList.toggle('done', b.dataset.t === '1' && reps > 0 && (parseFloat(w.value) > 0 || w.value.trim() === '0' || /[A-Z]/.test(w.value) || w.placeholder === 'BW')); }); }
 let mdT = 0; const mdQ = () => { cancelAnimationFrame(mdT); mdT = requestAnimationFrame(markDone); };
 document.addEventListener('input', e => { const b = e.target.closest('.set'); if (b) b.dataset.t = '1'; mdQ(); });
 document.addEventListener('click', e => { const b = e.target.closest('.set'); if (b && e.target.closest('.rm,.rp')) b.dataset.t = '1';
