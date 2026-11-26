@@ -8,6 +8,7 @@
 <title>My EMPWR</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="fw.js"></script>
 <script src="auth.js" data-mode="member"></script>
 <style>
 :root{--onyx:#12161F;--ink:#12161F;--red:#EB5345;--bg:#FFFFFF;--fg:#12161F;--card:#F3F4F6;--line:#D9DCE1;--mute:#6B7383;--good:#2FA84F}
@@ -85,7 +86,7 @@ const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.ge
 const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
 // Estimated 5RM from any set of 1 to 12 reps (EMPWR does not test 1RMs)
 const e5 = (w, r) => (w > 0 && r >= 1 && r <= 12) ? w * (1 + r / 30) / (1 + 5 / 30) : 0;
-const lb = x => (+x.weight || 0) * (+x.reps || 0);
+const lb = x => isInertia(x.weight) ? 0 : (+x.weight || 0) * (+x.reps || 0);   // flywheel sets don't count in lb
 
 // theme
 if (localStorage.getItem('empwrTheme') === 'dark') document.body.classList.add('dark');
@@ -181,7 +182,7 @@ function renderOverview() {
     <div class="card"><h3>Your Last 8 Weeks</h3><div class="sub">${monthDays} day${monthDays === 1 ? '' : 's'} in this month. Red = you trained.</div><div class="cal">${cal}</div></div>
     <div class="card"><h3>Pounds Moved Per Month</h3>${bars('cm', months, 'lb')}</div>
     ${recent.length ? `<div class="card"><h3>Pounds Moved Per Session</h3><div class="sub">Your last ${recent.length} sessions.</div>${bars('cs', recent, 'lb')}</div>` : ''}
-    ${P.length ? `<div class="card"><h3>🔥 Latest PRs</h3>${P.map(p => `<div class="row"><span><span class="nm">${esc(D.ex[p.exercise_id]?.name || 'Exercise')}</span><br>${lbl[p.pr_type] || esc(p.pr_type)}</span><span class="r"><b>${fmt(+p.value)}</b><br>${short(p.achieved_on + 'T12:00')}</span></div>`).join('')}</div>` : ''}`;
+    ${P.length ? `<div class="card"><h3>🔥 Latest PRs</h3>${P.map(p => `<div class="row"><span><span class="nm">${esc(D.ex[p.exercise_id]?.name || 'Exercise')}</span><br>${lbl[p.pr_type] || esc(p.pr_type)}</span><span class="r"><b>${p.pr_type === 'heaviest' && isInertia(p.value) ? fwTxt(p.value) : fmt(+p.value)}</b><br>${short(p.achieved_on + 'T12:00')}</span></div>`).join('')}</div>` : ''}`;
 }
 
 function liftStats(id) {
@@ -200,7 +201,7 @@ function renderLifts() {
   const order = ['Squat','Hinge','Horizontal Push','Vertical Push','Horizontal Pull','Vertical Pull','Single Leg','Jump','Sprint','Throw','Core','Other'];
   const html = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99 || a.localeCompare(b)).map(f =>
     `<div class="fam">${esc(f)}</div>` + groups[f].map(id => { const st = liftStats(id), p = st.pts, up = p.length > 1 ? p[p.length - 1].v - p[0].v : 0;
-      return `<div class="row tap" data-lift="${id}"><span><span class="nm">${esc(D.ex[id]?.name || 'Exercise')}</span><br><span class="sub">Last: ${+st.last.weight ? +st.last.weight + ' lb' : 'BW'} × ${st.last.reps}, ${short(st.last.created_at)}</span></span>
+      return `<div class="row tap" data-lift="${id}"><span><span class="nm">${esc(D.ex[id]?.name || 'Exercise')}</span><br><span class="sub">Last: ${+st.last.weight ? (isInertia(st.last.weight) ? fwTxt(st.last.weight) : +st.last.weight + ' lb') : 'BW'} × ${st.last.reps}, ${short(st.last.created_at)}</span></span>
         <span class="r">${st.best5 ? `<b>${fmt(st.best5)}</b> est. 5RM` : ''}${up > 0 ? `<br><span class="up">+${fmt(up)} lb</span>` : ''}</span></div>`; }).join('')).join('');
   $('lifts').innerHTML = `<div class="card" id="liftList"><h3>Your Lifts</h3><div class="sub">Est. 5RM = the best 5-rep weight your sets point to. Tap a lift for its full history.</div>${html}</div><div id="liftDetail"></div>`;
   $('lifts').querySelectorAll('[data-lift]').forEach(r => r.onclick = () => liftDetail(r.dataset.lift));
@@ -209,7 +210,7 @@ function renderLifts() {
 function liftDetail(id) {
   const st = liftStats(id), byLog = {};
   st.sets.forEach(s => (byLog[s.workout_log_id] ||= []).push(s));
-  const rows = Object.values(byLog).reverse().map(ss => `<div class="row"><span><b>${day(ss[0].created_at)}</b><div class="chips">${ss.sort((a, b) => a.set_number - b.set_number).map(s => `<span>${+s.weight ? +s.weight : 'BW'} × ${s.reps}</span>`).join('')}</div></span><span class="r">${fmt(ss.reduce((a, s) => a + lb(s), 0))} lb</span></div>`).join('');
+  const rows = Object.values(byLog).reverse().map(ss => `<div class="row"><span><b>${day(ss[0].created_at)}</b><div class="chips">${ss.sort((a, b) => a.set_number - b.set_number).map(s => `<span>${+s.weight ? fmtW(s.weight) : 'BW'} × ${s.reps}</span>`).join('')}</div></span><span class="r">${fmt(ss.reduce((a, s) => a + lb(s), 0))} lb</span></div>`).join('');
   $('liftList').classList.add('hidden');
   $('liftDetail').innerHTML = `<button class="main" style="background:var(--ink);margin-top:4px" id="liftBack">‹ All Lifts</button><div class="card"><h3>${esc(D.ex[id]?.name || 'Exercise')}</h3>
     <div class="tiles" style="margin-bottom:10px"><div class="tile"><b>${fmt(st.best5)}</b><span>BEST EST. 5RM</span></div><div class="tile"><b>${fmt(st.bestVol)}</b><span>BEST SESSION VOLUME (LB)</span></div></div>
@@ -224,7 +225,7 @@ function renderHistory() {
   $('hist').innerHTML = `<div class="sub" style="margin-top:8px">Every session you've logged, so you can repeat any workout anywhere.</div>` + S.map(s => {
     const ps = D.ses[s.session_id], by = {}; s.sets.forEach(x => (by[x.exercise_id] ||= []).push(x));
     return `<div class="card sess"><div class="row" style="border:0;padding-top:0"><span><span class="nm">${day(s.created_at)}</span>${ps ? `<br><span class="sub">${esc(ps.title || '')}${ps.week ? ' · Week ' + esc(ps.week) : ''}</span>` : ''}</span><span class="r"><b>${fmt(s.lb)}</b> lb</span></div>
-      ${Object.keys(by).map(id => `<div class="ex"><b>${esc(D.ex[id]?.name || 'Exercise')}</b><div class="chips">${by[id].sort((a, b) => a.set_number - b.set_number).map(x => `<span>${+x.weight ? +x.weight : 'BW'} × ${x.reps}</span>`).join('')}</div></div>`).join('')}</div>`; }).join('');
+      ${Object.keys(by).map(id => `<div class="ex"><b>${esc(D.ex[id]?.name || 'Exercise')}</b><div class="chips">${by[id].sort((a, b) => a.set_number - b.set_number).map(x => `<span>${+x.weight ? fmtW(x.weight) : 'BW'} × ${x.reps}</span>`).join('')}</div></div>`).join('')}</div>`; }).join('');
 }
 
 function renderFeel() {

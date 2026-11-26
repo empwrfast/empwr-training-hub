@@ -4,6 +4,7 @@
 <title>EMPWR Today's Lift</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="fw.js"></script>
 <script src="auth.js" data-mode="staff"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
@@ -372,7 +373,7 @@ async function loadStats(){
     .select('value,pr_type,members(first_name,last_name),exercises(name)')
     .eq('achieved_on', today).eq('pr_type','heaviest').limit(6);
   if (data && data.length) document.getElementById('feed').innerHTML =
-    data.map(p=>`🔥 <b>${ini(p.members)}</b> ${p.exercises.name} ${+p.value}`).join('<br>');
+    data.map(p=>`🔥 <b>${ini(p.members)}</b> ${p.exercises.name} ${fmtW(p.value)}`).join('<br>');
 }
 (async()=>{
   const sid = await loadSession();
@@ -454,7 +455,7 @@ async function loadLast(){ try {
       if (!(k in wl)) wl[k] = r.workout_log_id; if (wl[k] !== r.workout_log_id) return;
       if (!best[k] || +r.weight > +best[k].weight) best[k] = r; });
     rows = (ms || []).sort((a, b) => a.first_name.localeCompare(b.first_name)).map(m => ({ id: m.id, name: `${m.first_name} ${(m.last_name || '').slice(0, 1)}.`,
-      vals: lifts.map(l => { const b = best[m.id + '|' + idBy[l.exercise]]; return b ? `${+b.weight} × ${b.reps}` : '<span class="ltnew">New</span>'; }) }));
+      vals: lifts.map(l => { const b = best[m.id + '|' + idBy[l.exercise]]; return b ? `${isInertia(b.weight) ? wCombo(b.weight) : +b.weight} × ${b.reps}` : '<span class="ltnew">New</span>'; }) }));
   }
   // RESILIENCY (cardio) columns: last distance / cals / time, from their last logged workout
   const cp = pages.find(p => /^RESILIENCY/i.test(p.nm)), cardio = cp ? cp.items.filter(r => (r.exercise || '').trim()) : [];

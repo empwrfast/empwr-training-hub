@@ -4,6 +4,7 @@
 <title>EMPWR Log Your Lift</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="fw.js"></script>
 <script src="auth.js" data-mode="staff"></script>
 <style>
 :root{--ink:#12161F;--onyx:#12161F;--red:#EB5345;--wht:#FFFFFF;--bg:var(--wht);--fg:var(--onyx);--card:#F3F4F6;--line:#D9DCE1}
@@ -275,9 +276,9 @@ document.addEventListener('click', e => { const b = e.target.closest('.optp butt
   card.dataset.o = oi; card.querySelectorAll('.optp button').forEach(x => x.classList.toggle('on', x === b));
   const md = modeOf(it, oi), L = lastSets[exIdOf(it, oi)]; card.classList.toggle('sd', !!md.sides);
   card.querySelectorAll('.set').forEach((r, s) => { const w = r.querySelector('[data-w]'), x = L && (L.sets[s] || L.sets[L.sets.length-1]);
-    w.placeholder = md.bw ? 'BW' : 'lb'; w.value = x && +x.weight ? round5(x.weight*(rule.load_pct/100)) : '';
+    w.placeholder = md.bw ? 'BW' : 'lb'; w.value = x && +x.weight ? (isInertia(x.weight) ? wCombo(x.weight) : round5(x.weight*(rule.load_pct/100))) : '';
     if (md.bw) r.querySelectorAll('[data-r],[data-r2]').forEach(i => i.value = ''); });
-  const sg = card.querySelector('.lastln'); if (sg) sg.textContent = L ? `Last time: ${L.sets.map(x=>`${+x.weight ? +x.weight : 'BW'} × ${x.reps}`).join(' · ')}` : 'First time logging this one. Pick a weight you can own.';
+  const sg = card.querySelector('.lastln'); if (sg) sg.textContent = L ? `Last time: ${L.sets.map(x=>`${+x.weight ? fmtW(x.weight) : 'BW'} × ${x.reps}`).join(' · ')}` : 'First time logging this one. Pick a weight you can own.';
   updVol(); });
 // remove a set added by accident
 document.addEventListener('click', e => { const x = e.target.closest('.set .xs'); if (!x) return; const card = x.closest('.ex'); x.closest('.set').remove();
@@ -355,7 +356,7 @@ async function pinGate(m){
 // MY PROGRESS: every week they've logged, top set per lift week by week, weekly volume, PRs
 const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const wkLbl = d => d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '');
-const wtx = w => +w ? `${+w}` : 'BW';
+const wtx = w => +w ? `${fmtW(w)}` : 'BW';
 async function showProgress(back){
   $('progBack').onclick = () => { show(back); scrollTo(0, 0); };
   $('progT').textContent = `${member.first}'s Progress`; $('prog').innerHTML = '<div class="card">Loading...</div>'; show('stepProg'); scrollTo(0, 0);
@@ -378,13 +379,13 @@ async function showProgress(back){
   const lastSeen = id => Math.max(...Object.keys(byEx[id]).map(Number));
   const lifts = Object.keys(byEx).sort((a, b) => lastSeen(b) - lastSeen(a)).map(id => { const ks = Object.keys(byEx[id]).map(Number).sort((a, b) => a - b), f = byEx[id][ks[0]], l = byEx[id][ks[ks.length - 1]];
     const up = l.w - f.w;
-    return `<div class="lift"><div class="nm">${nm[id] || 'Exercise'}${ks.length > 1 && up > 0 ? ` <span class="up">+${up} lb</span>` : ''}</div>
+    return `<div class="lift"><div class="nm">${nm[id] || 'Exercise'}${ks.length > 1 && up > 0 && !isInertia(f.w) ? ` <span class="up">+${up} lb</span>` : ''}</div>
       <div class="chips">${ks.slice(-6).map(k => `<span><em>Wk Of ${wkLbl(new Date(k))}</em>${wtx(byEx[id][k].w)} × ${byEx[id][k].r}</span>`).join('')}</div></div>`; }).join('');
   const label = { heaviest: 'Heaviest', est_5rm: 'Est. 5RM', session_volume: 'Best Volume' };
   $('prog').innerHTML = `
     <div class="card pgk"><div><b>${sess}</b><span>Sessions Logged</span></div><div><b>${weeks.length}</b><span>Weeks Training</span></div><div><b>${fmt(total)}</b><span>Total lb Moved</span></div></div>
     ${lastW.length ? `<div class="card"><h3>Pounds Moved Per Week</h3>${lastW.map(k => `<div class="wk"><span>${wkLbl(new Date(k))}</span><i style="width:${Math.max(3, vol(k) / maxV * 100) * .62}%"></i><b>${fmt(vol(k))}</b></div>`).join('')}</div>` : ''}
-    ${P.length ? `<div class="card"><h3>🔥 Your PRs</h3>${P.slice(0, 15).map(p => `<div class="prr"><span><b>${nm[p.exercise_id] || 'Exercise'}</b><br>${label[p.pr_type] || p.pr_type}</span><span style="text-align:right"><b>${+p.value}</b><br>${new Date(p.achieved_on + 'T12:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')}</span></div>`).join('')}</div>` : ''}
+    ${P.length ? `<div class="card"><h3>🔥 Your PRs</h3>${P.slice(0, 15).map(p => `<div class="prr"><span><b>${nm[p.exercise_id] || 'Exercise'}</b><br>${label[p.pr_type] || p.pr_type}</span><span style="text-align:right"><b>${p.pr_type === 'heaviest' ? fmtW(p.value) : +p.value}</b><br>${new Date(p.achieved_on + 'T12:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }).replace(/\./g, '')}</span></div>`).join('')}</div>` : ''}
     ${lifts ? `<div class="card"><h3>Your Lifts, Week By Week</h3><div style="font-size:12px;color:var(--mute,#8a8f98);margin-bottom:4px">Top set each week. Most recent lifts first.</div>${lifts}</div>` : ''}`;
 }
 
@@ -516,11 +517,11 @@ async function loadSession(){
     const nSets = Math.max(1, it.sets || 3);
     const base = it.max_base || (L && L.sets[0] ? +L.sets[0].reps : MAX_BASE), mr = maxRule(it, base), w1 = wk1Max[exIdOf(it, 0)], rg = maxRange(it, base);
     const mult = /\de\b/i.test(repsOf(it)) || (mr && /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|\bSL\b|\bSA\b|EACH SIDE/i.test(it.exercise)) ? 2 : 1;
-    const wFor = s => { if (mr && w1) return w1; if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? round5(x.weight*pct) : ''; };
+    const wFor = s => { if (mr && w1) return w1; if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? (isInertia(x.weight) ? +x.weight : round5(x.weight*pct)) : ''; };
     const rFor = s => { if (md.bw) return ''; if (mr) { if (s === nSets-1) return ''; return base; } return parseInt(repsOf(it))||''; };
     return `<div class="card ex${gapSet.has(idx)?' gap':''}${md.sides ? ' sd' : ''}" data-idx="${idx}" data-o="0" data-mult="${mult}" data-prev="${L ? L.sets.reduce((a,x)=>a+(+x.weight||0)*(+x.reps||0),0)*mult : 0}">${head}
       ${opts && lift ? `<div class="optp"><div class="chz2">Pick One</div>${opts.map((o,i)=>`<button data-o="${i}" class="${i?'':'on'}">${o.label}</button>`).join('')}${opts.some(o=>o.bw) ? '<div style="font-size:13px;width:100%">Chin-Ups: Leave Weight On BW For Bodyweight, Or Type Only The Weight You Added.</div>' : ''}</div>` : ''}
-      <div class="sugg">${mr ? `<div style="font-weight:700;margin-bottom:4px">${mr}${w1 ? ` Your Week 1 top weight: ${w1} lb.` : ''}</div>` : ''}${!lift ? '' : L ? `<span class="lastln">Last time: ${L.sets.map(x=>`${+x.weight ? +x.weight : 'BW'} × ${x.reps}`).join(' · ')}</span>${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : '<span class="lastln">First time logging this one. Pick a weight you can own.</span>'}
+      <div class="sugg">${mr ? `<div style="font-weight:700;margin-bottom:4px">${mr}${w1 ? ` Your Week 1 top weight: ${w1} lb.` : ''}</div>` : ''}${!lift ? '' : L ? `<span class="lastln">Last time: ${L.sets.map(x=>`${+x.weight ? fmtW(x.weight) : 'BW'} × ${x.reps}`).join(' · ')}</span>${rule.load_pct<100?`<br>Today's weights are ${100-rule.load_pct}% lighter (readiness).`:''}` : '<span class="lastln">First time logging this one. Pick a weight you can own.</span>'}
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
       ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button><div class="sethdr"><span></span><span>Weight (lb) <button class="fill" data-c="w">Autofill ↓</button></span><span>Reps${repsOf(it) ? ` · Target <b>${repsOf(it)}</b>` : ''} <button class="fill" data-c="r">Autofill ↓</button></span></div>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="${md.bw ? 'BW' : 'lb'}" value="${wFor(s)}" data-w>
@@ -565,7 +566,7 @@ $('saveBtn').onclick = async () => {
   document.querySelectorAll('.ex').forEach(card=>{
     const it = items[+card.dataset.idx], oi = +card.dataset.o || 0, md = modeOf(it, oi), exId = exIdOf(it, oi), opt = (optsOf(it) || [])[oi];
     let n = 0; card.querySelectorAll('.set').forEach(row=>{ const r2el = md.sides ? row.querySelector('[data-r2]') : null;
-      let w = parseFloat(row.querySelector('[data-w]').value); const r = parseInt(row.querySelector('[data-r]').value) || 0, r2 = r2el ? parseInt(r2el.value) || 0 : 0;
+      let w = wVal(row.querySelector('[data-w]')); const r = parseInt(row.querySelector('[data-r]').value) || 0, r2 = r2el ? parseInt(r2el.value) || 0 : 0;
       if (!(r || r2) || !exId) return; if (!w) { if (!md.bw) return; w = 0; }   // chin-ups: blank weight = bodyweight
       rows.push({member_id: member.id, exercise_id: exId, set_number: ++n, weight: w, reps: r2el ? (r && r2 ? Math.min(r, r2) : r || r2) : r});
       if (r2el) sides.push({exercise_id: exId, set: n, left: r || null, right: r2 || null}); });
@@ -593,7 +594,7 @@ $('saveBtn').onclick = async () => {
 // done sets: once the member touches a set (types, taps − / +, or Autofill) and it has reps plus a weight (or BW), the row goes dark so it's clear it's logged
 function markDone(){ document.querySelectorAll('.set').forEach(b => { const w = b.querySelector('[data-w]'), r = b.querySelector('[data-r]'), r2 = b.querySelector('[data-r2]'); if (!w || !r) return;
   const reps = (parseInt(r.value) || 0) + (r2 ? parseInt(r2.value) || 0 : 0);
-  b.classList.toggle('done', b.dataset.t === '1' && reps > 0 && (parseFloat(w.value) > 0 || w.placeholder === 'BW')); }); }
+  b.classList.toggle('done', b.dataset.t === '1' && reps > 0 && (parseFloat(w.value) > 0 || /[A-Z]/.test(w.value) || w.placeholder === 'BW')); }); }
 let mdT = 0; const mdQ = () => { cancelAnimationFrame(mdT); mdT = requestAnimationFrame(markDone); };
 document.addEventListener('input', e => { const b = e.target.closest('.set'); if (b) b.dataset.t = '1'; mdQ(); });
 document.addEventListener('click', e => { const b = e.target.closest('.set'); if (b && e.target.closest('.rm,.rp')) b.dataset.t = '1';
