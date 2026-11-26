@@ -237,7 +237,7 @@ const titleCase = s => s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s|&)
 const scheme = r => { const reps = String(r.reps||'').split('|').pop().trim();
   if (/MAX/i.test(reps) && /wk\s*1/i.test(reps)) return `${Math.max(1, (r.sets || 2) - 1)} x ${r.max_base || 6}, 1 x MAX @ Wk 1 Top Weight`;
   return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} set${r.sets>1?'s':''}`) : reps; };
-let pages = [], pageIdx = 0, sessionId = null, curSlot = null;
+let pages = [], pageIdx = 0, sessionId = null, curSlot = null; let curWeek = null;
 
 function setHeader(s){
   const t = (s.title||'').trim();
@@ -341,7 +341,7 @@ setInterval(()=>{ const d=new Date(); document.getElementById('tclk').textConten
 async function loadSession(){
   const { data, error } = await sessionRows();
   if (error || !data || !data.length){ pages = []; draw(); return null; }
-  setHeader(data[0]); if (data[0].slot !== curSlot) pageIdx = 0; curSlot = data[0].slot;
+  setHeader(data[0]); if (data[0].slot !== curSlot) pageIdx = 0; curSlot = data[0].slot; curWeek = data[0].week;
   pages = []; let cur = null;
   data.forEach(r=>{
     const raw = (r.intensity||'').replace(/\s+/g,' ').trim();
@@ -382,6 +382,13 @@ async function loadStats(){
     .on('postgres_changes',{event:'*',schema:'public',table:'personal_records'},loadStats).subscribe();
   setInterval(()=>{ loadSession(); loadStats(); }, 5*60*1000);
 })();
+// follow the Coach Board: when the coach switches sections, jump to the same section (and class / week if different)
+const secKey = s => String(s || '').includes('☠') ? '☠' : String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
+sb.channel('empwr-tv').on('broadcast', { event: 'sec' }, async ({ payload: p }) => { if (!p || !p.nm) return; let re = false;
+  if (p.slot && p.slot !== curSlot) { pickSlot(p.slot); re = true; }
+  if (p.week && p.week !== curWeek) { pickWeek(p.week); re = true; }
+  if (re) await loadSession();
+  const j = pages.findIndex(pg => !pg.last && secKey(pg.nm) === secKey(p.nm)); if (j > -1 && j !== pageIdx) { pageIdx = j; draw(); } }).subscribe();
 </script><script>
 // Shrink the warm-up page just enough to fit, so text stays as big as possible
 function fitWU(){ const L = document.getElementById('lifts'); if (!L) return;

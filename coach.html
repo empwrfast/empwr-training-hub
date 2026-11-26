@@ -230,6 +230,9 @@ $('startBtn').onclick = load;
 // top line like the TV: logo, phase, aim in cursive (as big as it fits), day / date / week
 // session time: defaults to the session closest to now, tap to switch
 let curSlot = null;
+// gym TV follows the Coach Board: switching sections here flips the TV to the same section (and class / week)
+const tvCh = sb.channel('empwr-tv'); tvCh.subscribe();
+function tvSync(nm){ if (curSlot === 'open') return; try { tvCh.send({ type: 'broadcast', event: 'sec', payload: { nm, slot: curSlot, week: pickedWeek() } }); } catch (e) {} }
 document.addEventListener('change', async e => { const sel = e.target.closest('.slotSel'); if (!sel) return; const nx = sel.value;
   if (items.length && !confirm('Switch to ' + (nx === 'open' ? 'Open Gym' : 'the ' + fmtSlot(nx) + ' class') + '? Numbers you have not saved will be cleared.')) { sel.value = curSlot; return; }
   pickSlot(nx); const { data } = await sessionRows('title,week,slot'); if (data && data[0]) setHeader(data[0]); if (items.length) load(); });
@@ -393,7 +396,7 @@ async function load(){
 
   $('board').innerHTML = `<div id="tabs">${blocks.map((b, i) => `<button data-b="${i}">${b.nm}</button>`).join('')}</div>` +
     blocks.map((b, i) => `<div class="blk" data-b="${i}"><div class="band"><div><span class="nm">${b.nm}</span><span class="q">${b.q}</span></div></div>${blockHtml(b)}</div>`).join('');
-  const showBlock = i => { document.querySelectorAll('.blk').forEach(el => el.classList.toggle('hidden', +el.dataset.b !== i));
+  const showBlock = (i, quiet) => { if (!quiet) tvSync(blocks[i].nm); document.querySelectorAll('.blk').forEach(el => el.classList.toggle('hidden', +el.dataset.b !== i));
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', +b.dataset.b === i)); scrollTo(0, 0);
     // bottom bar: previous / next section; Save All shows on the last section (numbers autosave on this device as you go)
     const pv = blocks[i - 1], nx = blocks[i + 1];
@@ -401,7 +404,7 @@ async function load(){
     $('nextB').hidden = !nx; $('nextB').textContent = nx ? nx.nm + ' ›' : ''; $('nextB').onclick = () => nx && showBlock(i + 1);
     $('bnav').classList.toggle('hidden', !pv && !nx); $('saveAll').classList.toggle('hidden', !!nx); };
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showBlock(+b.dataset.b));
-  showBlock(0); show('stepBoard'); totals();
+  showBlock(0, true); show('stepBoard'); totals();
 }
 
 // grey numbers = last time; tap Same As Last to drop them in
