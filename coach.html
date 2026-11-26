@@ -487,6 +487,8 @@ const WHY_FAM = { 'Knee Pain': 'Hinge', 'Low Back': 'Single Leg' };
 const UNI = /\b(SL|SA|SINGLE|1\s*-?\s*(ARM|LEG)|SPLIT|LUNGE|STEP|RFE|BULGARIAN|1\/2|HALF KNEEL|KNEELING|STAGGER|OFFSET|SUITCASE|EACH|ALT|ALTERNATING|PISTOL|SKATER|B\s*-?\s*STANCE|KICKSTAND|COPENHAGEN|UNILATERAL)\b/i;
 const isUni = e => !!e.unilateral || UNI.test(e.name) || (FAMS.find(f => f.id === e.family_id) || {}).name === 'Single Leg';
 // done either way (2 legs or 1): show under Bilateral and Unilateral
+// hamstring moves that live in Hinge or Single Leg also show under Hamstring
+const HAM = /LEG\s*CURL|HAMSTRING|GLUTE HAM|HYPE?R|NORDIC/i;
 const EITHER = /GLUTE HAM|HYPE?R\b|HYPER/i;
 const famName = id => (FAMS.find(f => f.id === id) || {}).name || '';
 const pill = (k, v, on) => `<button data-${k}="${esc(v)}" class="${on ? 'on' : ''}">${esc(v)}</button>`;
@@ -513,7 +515,7 @@ function openMod(row){
 
 function drawAlts(row){ const st = row._ms, mp = row.querySelector('.mp'), q = st.q.toLowerCase();
   const fam = FAMS.find(f => f.name === st.fam);
-  const list = LIB.filter(e => (!fam || e.family_id === fam.id || (fam.name === 'Single Leg' && isUni(e) && famName(e.family_id) === 'Squat'))
+  const list = LIB.filter(e => (!fam || e.family_id === fam.id || (fam.name === 'Single Leg' && isUni(e) && famName(e.family_id) === 'Squat') || (fam.name === 'Hamstring' && HAM.test(e.name)))
     && (st.side === 'Both' || EITHER.test(e.name) || (st.side === 'Unilateral') === isUni(e)) && (!q || e.name.toLowerCase().includes(q))).slice(0, 60);
   mp.querySelector('.alts').innerHTML = list.length ? list.map(e => `<button data-alt="${e.id}" class="${st.alt === e.id ? 'on' : ''}">${esc(e.name)}</button>`).join('')
     : '<div style="font-size:13px;color:var(--mute)">No matches. Try Both or clear the search.</div>'; }
