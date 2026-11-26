@@ -85,7 +85,7 @@ const short = d => new Date(d).toLocaleDateString('en-CA', { month: 'short', day
 const monday = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.getTime(); };
 const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
 // Estimated 5RM from any set of 1 to 12 reps (EMPWR does not test 1RMs)
-const e5 = (w, r) => (w > 0 && r >= 1 && r <= 12) ? w * (1 + r / 30) / (1 + 5 / 30) : 0;
+const e5 = (w, r) => (w >= 1 && !isInertia(w) && r >= 1 && r <= 12) ? w * (1 + r / 30) / (1 + 5 / 30) : 0;
 const lb = x => isInertia(x.weight) ? 0 : (+x.weight || 0) * (+x.reps || 0);   // flywheel sets don't count in lb
 
 // theme
