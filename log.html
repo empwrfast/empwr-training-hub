@@ -47,6 +47,7 @@ button.sec{background:var(--ink)}
 .sugg b{color:var(--red)}
 .set{display:grid;grid-template-columns:40px 1fr 1fr;gap:8px;align-items:center;margin:6px 0}
 .set span{font-family:'Bebas Neue';font-size:22px;text-align:center}
+.set.done input{background:#12161F;color:#fff;border-color:#12161F}.set.done input::placeholder{color:#9aa0a8}.set.done span{color:#2FA84F}body.dark .set.done input{background:#000;border-color:#2FA84F}
 .pr{color:var(--red);font-weight:800}
 footer{position:fixed;bottom:8px;right:12px}
 footer img{height:40px}
@@ -84,6 +85,8 @@ body{max-width:900px}
 .optp button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .rbox{display:flex;flex-direction:column;gap:6px}.rbox .sl{font:800 11px Montserrat,sans-serif;color:var(--mute);flex:0 0 18px;align-self:center;text-align:center}
 .rstep.r2{display:none}.ex.sd .rstep.r2{display:flex}.rstep .sl{display:none}.ex.sd .rstep .sl{display:block}
+.rstep input[data-r],.rstep input[data-r2]{font-weight:800;font-size:24px;padding:10px 4px}
+@media (max-width:600px){.set,.sethdr,.wset{grid-template-columns:24px minmax(0,1fr) minmax(0,1.7fr);gap:6px}.set span{font-size:20px}.set input[data-w]{font-size:22px;padding:10px 8px}.rstep{gap:4px}.rstep button{flex:0 0 40px;font-size:22px}.rstep input::placeholder{font-size:13px;font-weight:600}}
 .set .xs{display:block;border:0;background:none;color:var(--mute);font-size:16px;font-weight:800;cursor:pointer;padding:0}
 .addset{background:none;border:1px dashed var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;font-family:Montserrat,sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin:4px 0 0}
 .exnote{margin-top:8px;font-size:15px;padding:10px 12px;border-style:dashed}
@@ -292,7 +295,7 @@ function updVol(){ let total = 0; const rows = [];
     if (v) { total += v; rows.push({name: items[+card.dataset.idx].exercise, lb: v}); } });
   const t = $('wtotal'); if (t) t.innerHTML = total ? `Workout Total: <b>${fmt(total)} lb</b>` : '';
   return {total, rows}; }
-document.addEventListener('input', e => { if (e.target.matches('.set input')) updVol(); });
+document.addEventListener('input', e => { if (e.target.matches('[data-r],[data-r2]') && e.target.value.length > 2) e.target.value = e.target.value.slice(0, 2); if (e.target.matches('.set input')) updVol(); });
 // Autofill: copy set 1's number down the whole column
 document.addEventListener('click', e => { const b = e.target.closest('.fill'); if (!b) return; const card = b.closest('.ex'), k = b.dataset.c;
   const ins = [...card.querySelectorAll('.set [data-' + k + ']')]; if (!ins.length || !ins[0].value) return; ins.forEach(i => i.value = ins[0].value); updVol(); });
@@ -586,4 +589,14 @@ $('saveBtn').onclick = async () => {
     `<button class="main sec" onclick="showProgress('stepSession')">See My Progress</button><button class="main" onclick="location.reload()">Next Person</button>`;
   $('saved').classList.remove('hidden'); $('saveBtn').classList.add('hidden');
 };
+
+// done sets: once the member touches a set (types, taps − / +, or Autofill) and it has reps plus a weight (or BW), the row goes dark so it's clear it's logged
+function markDone(){ document.querySelectorAll('.set').forEach(b => { const w = b.querySelector('[data-w]'), r = b.querySelector('[data-r]'), r2 = b.querySelector('[data-r2]'); if (!w || !r) return;
+  const reps = (parseInt(r.value) || 0) + (r2 ? parseInt(r2.value) || 0 : 0);
+  b.classList.toggle('done', b.dataset.t === '1' && reps > 0 && (parseFloat(w.value) > 0 || w.placeholder === 'BW')); }); }
+let mdT = 0; const mdQ = () => { cancelAnimationFrame(mdT); mdT = requestAnimationFrame(markDone); };
+document.addEventListener('input', e => { const b = e.target.closest('.set'); if (b) b.dataset.t = '1'; mdQ(); });
+document.addEventListener('click', e => { const b = e.target.closest('.set'); if (b && e.target.closest('.rm,.rp')) b.dataset.t = '1';
+  const f = e.target.closest('.fill'); if (f) f.closest('.ex')?.querySelectorAll('.set').forEach(x => x.dataset.t = '1'); mdQ(); });
+new MutationObserver(mdQ).observe(document.body, { childList: true, subtree: true });
 </script></body></html>

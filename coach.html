@@ -54,6 +54,7 @@ button{font:inherit;cursor:pointer}
 .st input{width:70px;padding:8px 6px;font-size:17px;text-align:center;border:0;background:var(--card)}
 .st input[data-r]{width:52px}.st input[data-min]{width:66px;font-size:15px}
 .st i{font-style:normal;color:var(--mute)}
+.st.done{background:var(--ink);border-color:var(--ink)}.st.done input{background:#2C3446;color:#fff;font-weight:700}.st.done span,.st.done i{color:#fff}.st.done input::placeholder{color:#9aa0a8}
 .same{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:10px;padding:0 12px;font-weight:700;font-size:13px}
 .st input[data-w]::placeholder{color:#b5b9c0}
 .plus{border:1px dashed var(--line);background:none;border-radius:10px;padding:0 12px;font-weight:700;color:var(--mute)}
@@ -646,5 +647,13 @@ $('pinRes').onclick = async e => { const b = e.target.closest('button'); if (!b)
   const r = await sb.rpc('clear_member_pin', { p_member: String(b.dataset.id) });
   $('pinRes').innerHTML = ''; $('pinQ').value = '';
   $('pinOk').textContent = r.error ? 'Could not reset. Is this device signed in?' : `Done. ${b.dataset.n} picks a new PIN next time.`; };
+
+// done sets: once a set has reps plus a weight (or bodyweight, once touched) the box goes dark so it's clear it's logged
+function markDone(){ document.querySelectorAll('.st').forEach(b => { const w = b.querySelector('[data-w]'), r = b.querySelector('[data-r]'), r2 = b.querySelector('[data-r2]'); if (!w || !r) return;
+  const reps = (parseInt(r.value) || 0) + (r2 ? parseInt(r2.value) || 0 : 0), bw = !!b.querySelector('.bw') || b.closest('.ex,.card')?.dataset.bw === '1';
+  b.classList.toggle('done', reps > 0 && (parseFloat(w.value) > 0 || (bw && b.dataset.t === '1'))); }); }
+let mdT = 0; const mdQ = () => { cancelAnimationFrame(mdT); mdT = requestAnimationFrame(markDone); };
+document.addEventListener('input', e => { const b = e.target.closest('.st'); if (b) b.dataset.t = '1'; mdQ(); });
+document.addEventListener('click', mdQ); new MutationObserver(mdQ).observe(document.body, { childList: true, subtree: true });
 </script>
 </body></html>
