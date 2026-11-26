@@ -49,7 +49,9 @@
         const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
         $('ea-send').disabled = false;
         if (error) return err(/rate|seconds/i.test(error.message) ? 'Hang on a minute, then try again.' : 'Could not send the code. Try again.');
-        $('ea-note').textContent = `Check ${email} for a 6-digit code.`;
+        $('ea-note').textContent = mode === 'member'
+          ? `If you have portal access, a 6-digit code is on its way to ${email}. If not, your request just went to EMPWR and we'll let you know once you're in.`
+          : `Check ${email} for a 6-digit code.`;
         $('ea-s1').classList.add('hidden'); $('ea-s2').classList.remove('hidden'); $('ea-code').focus();
       };
       $('ea-email').onkeydown = e => { if (e.key === 'Enter') $('ea-send').click(); };
@@ -79,7 +81,7 @@
   // If the database login step has not been run yet, the page keeps working exactly as before.
   async function staffGate() {
     const w = await whoami();
-    if (w.error) return;
+    if (w.error || !w.gate) return;   // device sign-in switched off: page works as before
     if (w.staff) return;
     let note = 'Sign this device in with the EMPWR device email. It stays signed in after this.';
     if (w.member) { await sb.auth.signOut(); note = 'This device needs the EMPWR device email, not a member login.'; }
