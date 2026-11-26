@@ -221,6 +221,8 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
       const prev = (allp || []).filter(x => key(x) === key(r) && wkOf[x.session_id] === W - 1);
       const pr = prev.find(x => !x.sets && (x.reps || '').replace(/[|\s]/g, '')) || prev.find(x => (x.reps || '').replace(/[|\s]/g, ''));
       r.max_base = pr ? (parseInt(String(pr.reps).split('|').pop()) || null) : null; if (r.sets) r.sets = +r.sets + 1; });
+    // Friday 1 leg squat, final week: 2 x 6, then 1 x max reps in 30s at week 1 weight minus 10 lb
+    rows.forEach(r => { if ('max_base' in r && /1\s*LEG\s*SQUAT/i.test(r.exercise || '')) { r.max_30 = true; r.sets = 3; } });
     const rp = (allp || []).filter(x => /^RESILIENCY/i.test((x.intensity || '').trim()));
     const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
     if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
@@ -248,6 +250,7 @@ let member=null, readiness=null, rule=null, items=[], last={}, prs={}, lastSets=
 const MAX_BASE = 6;
 const maxRange = (it, base) => { const m = String(it.reps||'').match(/MAX\s*(\d+)\s*-\s*(\d+)/i); if (m) return [+m[1], +m[2]]; const lo = Math.round((base || MAX_BASE) * 1.5); return [lo, lo + 2]; };
 const maxRule = (it, base) => { const r = String(it.reps||''); if (!/MAX/i.test(r) || !/wk\s*1/i.test(r)) return '';
+  if (it.max_30) return `Use Your Week 1 Top Weight. 2 x ${base || MAX_BASE}, Then 1 x Max Reps In 30 Seconds At Week 1 Weight Minus 10 lb. Each Side.`;
   const rg = maxRange(it, base);
   const uni = /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|OVR\s*UNDER|MIXED|EACH SIDE/i.test(it.exercise) || /\d+e\b/i.test(r);
   return `Use Your Week 1 Top Weight. ${Math.max(1, (it.sets || 2) - 1)} x ${base || MAX_BASE}, Then 1 x Max Reps (Min ${rg[0]}, Max ${rg[1]})${uni ? '. One Side, Go Do The Rest, Then Come Back For The Other Side' : ''}.`; };
@@ -467,7 +470,7 @@ async function loadSession(){
     cur.idx.push(idx);
   });
   const repsOf = it => String(it.reps||'').split('|').pop().trim();
-  const schemeOf = it => /MAX/i.test(repsOf(it)) && /wk\s*1/i.test(repsOf(it)) ? `${Math.max(1, (it.sets || 2) - 1)} x ${it.max_base || MAX_BASE}, 1 x MAX @ Wk 1 Top Weight` : it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets>1?'s':''}`) : repsOf(it);
+  const schemeOf = it => it.max_30 ? `2 x ${it.max_base || MAX_BASE}, 1 x MAX In 30s @ Wk 1 Weight - 10 lb` : /MAX/i.test(repsOf(it)) && /wk\s*1/i.test(repsOf(it)) ? `${Math.max(1, (it.sets || 2) - 1)} x ${it.max_base || MAX_BASE}, 1 x MAX @ Wk 1 Top Weight` : it.sets ? (repsOf(it) ? `${it.sets} x ${repsOf(it)}` : `${it.sets} set${it.sets>1?'s':''}`) : repsOf(it);
 
   // Blank sets/reps = same as the exercise before it in the block
   blocks.forEach(b=>b.idx.forEach((ix,k)=>{ const it=items[ix];
@@ -517,7 +520,7 @@ async function loadSession(){
     const nSets = Math.max(1, it.sets || 3);
     const base = it.max_base || (L && L.sets[0] ? +L.sets[0].reps : MAX_BASE), mr = maxRule(it, base), w1 = wk1Max[exIdOf(it, 0)], rg = maxRange(it, base);
     const mult = /\de\b/i.test(repsOf(it)) || (mr && /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|\bSL\b|\bSA\b|EACH SIDE/i.test(it.exercise)) ? 2 : 1;
-    const wFor = s => { if (mr && w1) return w1; if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? (isInertia(x.weight) ? +x.weight : round5(x.weight*pct)) : ''; };
+    const wFor = s => { if (mr && w1) return it.max_30 && s === nSets-1 ? Math.max(0, w1 - 10) : w1; if (!L) return ''; const x = L.sets[s] || L.sets[L.sets.length-1]; return x && x.weight ? (isInertia(x.weight) ? +x.weight : round5(x.weight*pct)) : ''; };
     const rFor = s => { if (md.bw) return ''; if (mr) { if (s === nSets-1) return ''; return base; } return parseInt(repsOf(it))||''; };
     return `<div class="card ex${gapSet.has(idx)?' gap':''}${md.sides ? ' sd' : ''}" data-idx="${idx}" data-o="0" data-mult="${mult}" data-prev="${L ? L.sets.reduce((a,x)=>a+(+x.weight||0)*(+x.reps||0),0)*mult : 0}">${head}
       ${opts && lift ? `<div class="optp"><div class="chz2">Pick One</div>${opts.map((o,i)=>`<button data-o="${i}" class="${i?'':'on'}">${o.label}</button>`).join('')}${opts.some(o=>o.bw) ? '<div style="font-size:13px;width:100%">Chin-Ups: Leave Weight On BW For Bodyweight, Or Type Only The Weight You Added.</div>' : ''}</div>` : ''}
@@ -525,8 +528,8 @@ async function loadSession(){
         ${p.heaviest?`<br>PRs: heaviest ${p.heaviest} | est. 5RM ${p.est_5rm||'-'} | best volume ${p.session_volume||'-'}`:''}</div>
       ${!lift ? '' : `<div class="wus"></div><button class="addwu">+ Warm-Up Set</button><div class="sethdr"><span></span><span>Weight (lb) <button class="fill" data-c="w">Autofill ↓</button></span><span>Reps${repsOf(it) ? ` · Target <b>${repsOf(it)}</b>` : ''} <button class="fill" data-c="r">Autofill ↓</button></span></div>` + Array.from({length:nSets},(_,s)=>`<div class="set"><span>${s+1}</span>
         <input type="number" inputmode="decimal" placeholder="${md.bw ? 'BW' : 'lb'}" value="${wFor(s)}" data-w>
-        <div class="rbox"><div class="rstep"><span class="sl">L</span><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? `max ${rg[0]}-${rg[1]}` : 'reps'}" value="${rFor(s)}" data-r><button class="rp" aria-label="One more rep">+</button></div>
-        <div class="rstep r2"><span class="sl">R</span><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? `max ${rg[0]}-${rg[1]}` : 'reps'}" value="${rFor(s)}" data-r2><button class="rp" aria-label="One more rep">+</button></div></div></div>`).join('')}
+        <div class="rbox"><div class="rstep"><span class="sl">L</span><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? (it.max_30 ? 'max 30s' : `max ${rg[0]}-${rg[1]}`) : 'reps'}" value="${rFor(s)}" data-r><button class="rp" aria-label="One more rep">+</button></div>
+        <div class="rstep r2"><span class="sl">R</span><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? (it.max_30 ? 'max 30s' : `max ${rg[0]}-${rg[1]}`) : 'reps'}" value="${rFor(s)}" data-r2><button class="rp" aria-label="One more rep">+</button></div></div></div>`).join('')}
       ${!lift ? '' : '<div class="vol" data-vol></div><button class="addset">+ Add A Set</button>'}
       <input type="text" class="exnote" placeholder="Setup Note: Handle, Machine, Seat... (optional)" maxlength="140" value="${(lastNote[it.exercise_id]||'').replace(/"/g,'&quot;')}" data-note>
     </div>`; };

@@ -213,6 +213,8 @@ async function sessionRows(cols){ const res = await baseRows(); let rows = res.d
       const prev = (allp || []).filter(x => key(x) === key(r) && wkOf[x.session_id] === W - 1);
       const pr = prev.find(x => !x.sets && (x.reps || '').replace(/[|\s]/g, '')) || prev.find(x => (x.reps || '').replace(/[|\s]/g, ''));
       r.max_base = pr ? (parseInt(String(pr.reps).split('|').pop()) || null) : null; if (r.sets) r.sets = +r.sets + 1; });
+    // Friday 1 leg squat, final week: 2 x 6, then 1 x max reps in 30s at week 1 weight minus 10 lb
+    rows.forEach(r => { if ('max_base' in r && /1\s*LEG\s*SQUAT/i.test(r.exercise || '')) { r.max_30 = true; r.sets = 3; } });
     const rp = (allp || []).filter(x => /^RESILIENCY/i.test((x.intensity || '').trim()));
     const opts = []; (rp || []).forEach(x => { if (x.exercise_id && !opts.some(o => o.exercise_id === x.exercise_id)) opts.push(x); });
     if (opts.length > 1) { const me = (sib || []).find(s => s.week === rows[0].week) || { id: rows[0].session_id, title: rows[0].title, week: rows[0].week, day: rows[0].day };
@@ -236,6 +238,7 @@ t.onclick = () => { document.body.classList.toggle('dark');
 const pad = n => String(n).padStart(2,'0');
 const titleCase = s => s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s|&)(\w)/g,(m,a,b)=>a+b.toUpperCase()) : s;
 const scheme = r => { const reps = String(r.reps||'').split('|').pop().trim();
+  if (r.max_30) return `2 x ${r.max_base || 6}, 1 x MAX In 30s @ Wk 1 Weight - 10 lb`;
   if (/MAX/i.test(reps) && /wk\s*1/i.test(reps)) return `${Math.max(1, (r.sets || 2) - 1)} x ${r.max_base || 6}, 1 x MAX @ Wk 1 Top Weight`;
   return r.sets ? (reps ? `${r.sets} x ${reps}` : `${r.sets} set${r.sets>1?'s':''}`) : reps; };
 let pages = [], pageIdx = 0, sessionId = null, curSlot = null; let curWeek = null;
@@ -304,6 +307,7 @@ function draw(){
   if (pageIdx >= pages.length) pageIdx = 0;
   // Week-4 style 'MAX @ wk 1 wt': spell out how the sets run
   const maxRule = it => { const r = String(it.reps||''); if (!/MAX/i.test(r) || !/wk\s*1/i.test(r)) return '';
+    if (it.max_30) return `Use Your Week 1 Top Weight. 2 x ${it.max_base || 6}, Then 1 x Max Reps In 30 Seconds At Week 1 Weight Minus 10 lb. One Side, Go Do The Rest, Then Come Back For The Other Side.`;
     const rg = r.match(/MAX\s*(\d+)\s*-\s*(\d+)/i);
     const uni = /LUNGE|SPLIT|STEP\s*UP|1\s*ARM|1\s*LEG|SINGLE|OVR\s*UNDER|MIXED|EACH SIDE/i.test(it.exercise) || /\d+e\b/i.test(r);
     const lo = rg ? +rg[1] : Math.round((it.max_base || 6) * 1.5), hi = rg ? +rg[2] : lo + 2;
