@@ -533,7 +533,7 @@ async function loadSession(){
         <input type="number" inputmode="decimal" placeholder="${md.bw ? 'BW' : 'lb'}" value="${wFor(s)}" data-w>
         <div class="rbox"><div class="rstep"><span class="sl">L</span><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? (it.max_30 ? 'max 30s' : `max ${rg[0]}-${rg[1]}`) : 'reps'}" value="${rFor(s)}" data-r><button class="rp" aria-label="One more rep">+</button></div>
         <div class="rstep r2"><span class="sl">R</span><button class="rm" aria-label="One less rep">−</button><input type="number" inputmode="numeric" placeholder="${mr && s === nSets-1 ? (it.max_30 ? 'max 30s' : `max ${rg[0]}-${rg[1]}`) : 'reps'}" value="${rFor(s)}" data-r2><button class="rp" aria-label="One more rep">+</button></div></div></div>`).join('')}
-      ${!lift ? '' : '<div class="vol" data-vol></div><button class="addset">+ Add A Set</button>'}
+      ${!lift ? '' : '<div class="vol" data-vol></div><button class="addset">+ Add A Set</button><button class="swapb">⇄ Swap Exercise</button>'}
       <input type="text" class="exnote" placeholder="Setup Note: Handle, Machine, Seat... (optional)" maxlength="140" value="${(lastNote[it.exercise_id]||'').replace(/"/g,'&quot;')}" data-note>
     </div>`; };
 
@@ -570,13 +570,16 @@ $('saveBtn').onclick = async () => {
     const nt = card.querySelector('[data-note]'); if (nt && nt.value.trim()) (extra.notes ||= []).push({exercise_id: it.exercise_id, exercise: it.exercise, note: nt.value.trim()}); });
   const rows = [], sides = [], choices = [];
   document.querySelectorAll('.ex').forEach(card=>{
-    const it = items[+card.dataset.idx], oi = +card.dataset.o || 0, md = modeOf(it, oi), exId = exIdOf(it, oi), opt = (optsOf(it) || [])[oi];
+    const it = items[+card.dataset.idx], oi = +card.dataset.o || 0, sw = card._mod, md = sw && sw.alt ? {} : modeOf(it, oi), exId = (sw && sw.alt) || exIdOf(it, oi), opt = sw && sw.alt ? null : (optsOf(it) || [])[oi];
     let n = 0; card.querySelectorAll('.set').forEach(row=>{ const r2el = md.sides ? row.querySelector('[data-r2]') : null;
       let w = wVal(row.querySelector('[data-w]')); const r = parseInt(row.querySelector('[data-r]').value) || 0, r2 = r2el ? parseInt(r2el.value) || 0 : 0;
       if (!(r || r2) || !exId) return; if (!w) { if (!md.bw && (row.querySelector('[data-w]').value || '').trim() !== '0') return; w = 0; }   // chin-ups: blank weight = bodyweight; 0 = bodyweight on anything
       rows.push({member_id: member.id, exercise_id: exId, set_number: ++n, weight: w, reps: r2el ? (r && r2 ? Math.min(r, r2) : r || r2) : r});
       if (r2el) sides.push({exercise_id: exId, set: n, left: r || null, right: r2 || null}); });
     if (opt && n) choices.push({exercise_id: it.exercise_id, exercise: it.exercise, chose: opt.label});
+    if (sw) { const alt = sw.alt && LIB.find(e => e.id === sw.alt);
+      (extra.mods ||= []).push({exercise_id: it.exercise_id, exercise: it.exercise, swapped_to_id: sw.alt || null, swapped_to: alt ? alt.name : null, tool: sw.tool || null, sets: sw.sets, reps: sw.reps, reason: sw.why || null, note: sw.note || null, by: 'member'});
+      const nt = [sw.tool, sw.note].filter(Boolean).join(' · '); if (nt && exId) (extra.notes ||= []).push({exercise_id: exId, exercise: alt ? alt.name : it.exercise, note: nt}); }
   });
   extra.sides = sides; extra.choices = choices;
   const { data: wl, error } = await sb.from('workout_logs').insert({
@@ -606,4 +609,82 @@ document.addEventListener('input', e => { const b = e.target.closest('.set'); if
 document.addEventListener('click', e => { const b = e.target.closest('.set'); if (b && e.target.closest('.rm,.rp')) b.dataset.t = '1';
   const f = e.target.closest('.fill'); if (f) f.closest('.ex')?.querySelectorAll('.set').forEach(x => x.dataset.t = '1'); mdQ(); });
 new MutationObserver(mdQ).observe(document.body, { childList: true, subtree: true });
+
+// ===== SWAP: members can change the exercise, same panel as the Coach Board =====
+let LIB = null, FAMS = [];
+const TOOLS = ['DB', 'KB', 'Straight Bar', 'SSB', 'Trap Bar', 'Cable', 'Machine', 'Landmine', 'Band', 'Bodyweight', 'Smith'];
+const WHY = ['Knee Pain', 'Low Back', 'Shoulder', 'Hip', 'Wrist / Elbow', 'Equipment Busy', 'Did It Already', 'Regression', 'Progression', 'Other'];
+const WHY_FAM = { 'Knee Pain': 'Hinge', 'Low Back': 'Single Leg' };   // knee pain: go hinge; low back: go single leg
+const UNI = /\b(SL|SA|SINGLE|1\s*-?\s*(ARM|LEG)|SPLIT|LUNGE|STEP|RFE|BULGARIAN|1\/2|HALF KNEEL|KNEELING|STAGGER|OFFSET|SUITCASE|EACH|ALT|ALTERNATING|PISTOL|SKATER|B\s*-?\s*STANCE|KICKSTAND|COPENHAGEN|UNILATERAL)\b/i;
+const HAM = /LEG\s*CURL|HAMSTRING|GLUTE HAM|HYPE?R|NORDIC/i, EITHER = /GLUTE HAM|HYPE?R/i;
+const famName = id => (FAMS.find(f => f.id === id) || {}).name || '';
+const isUni = e => !!e.unilateral || UNI.test(e.name) || famName(e.family_id) === 'Single Leg';
+const escS = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const spill = (v, on) => `<button data-v="${escS(v)}" class="${on ? 'on' : ''}">${escS(v)}</button>`;
+async function libLoad(){ if (LIB) return; const [a, b] = await Promise.all([sb.from('exercises').select('id,name,family_id,unilateral').eq('active', true).order('name').limit(1000), sb.from('exercise_families').select('id,name').order('id')]); LIB = a.data || []; FAMS = b.data || []; }
+(() => { const s = document.createElement('style'); s.textContent = '.ex.swapped .sugg{display:none}.swapb{background:none;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;font:600 13px Montserrat,sans-serif;cursor:pointer;margin:4px 0 4px 8px}'
+  + '.swp{background:rgba(127,127,127,.08);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;margin-top:8px}.swp .lab{font-family:"Bebas Neue";font-size:17px;letter-spacing:.06em;opacity:.75}'
+  + '.swp .pills{display:flex;flex-wrap:wrap;gap:6px}.swp .pills button{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:16px;padding:6px 10px;font:600 12px Montserrat,sans-serif;cursor:pointer}.swp .pills button.on{background:var(--red);border-color:var(--red);color:#fff}'
+  + '.swp .alts{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:4px}.swp .alts button{text-align:left;border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:8px;padding:9px 10px;font:600 13px Montserrat,sans-serif;cursor:pointer}.swp .alts button.on{border:2px solid var(--red)}'
+  + '.swp input{font-size:15px;padding:9px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--fg)}.swp .rs{display:flex;gap:8px;align-items:center}.swp .rs input{width:80px;text-align:center}'
+  + '.swp .act{display:flex;gap:8px}.swp .act button{flex:1;border:0;border-radius:8px;padding:12px;font:800 14px Montserrat,sans-serif;cursor:pointer}.swtag{background:var(--red);color:#fff;border-radius:8px;padding:6px 10px;font-weight:700;font-size:13px;margin:4px 0}';
+  document.head.appendChild(s); })();
+
+async function openSwap(card){ const old = card.querySelector('.swp'); if (old) { old.remove(); return; } await libLoad();
+  const it = items[+card.dataset.idx], m = card._mod || {}, nm = it.exercise || '';
+  const fam0 = famName((LIB.find(e => e.id === it.exercise_id) || {}).family_id);
+  const st = card._ms = { tool: m.tool || '', why: m.why || '', fam: m.fam || fam0 || '', side: m.side || (isUni({ name: nm }) ? 'Unilateral' : 'Bilateral'), alt: m.alt || null, q: '',
+    sets: m.sets || card.querySelectorAll('.set').length, reps: m.reps || (card.querySelector('[data-r]') || {}).value || '', note: m.note || '' };
+  card.querySelector('.swapb').insertAdjacentHTML('afterend', `<div class="swp">
+    <div><div class="lab">Why The Change</div><div class="pills" data-g="why">${WHY.map(t => spill(t, st.why === t)).join('')}</div></div>
+    <div><div class="lab">Swap To</div><div class="pills" data-g="fam">${FAMS.filter(f => !/Sprint/i.test(f.name)).map(f => spill(f.name, st.fam === f.name)).join('')}</div>
+      <div class="pills" data-g="side" style="margin-top:6px">${['Bilateral', 'Unilateral', 'Both'].map(t => spill(t, st.side === t)).join('')}</div>
+      <input class="aq" placeholder="Search exercises" style="margin-top:8px;width:100%" autocomplete="off"><div class="alts" style="margin-top:6px"></div></div>
+    <div><div class="lab">Tool Used</div><div class="pills" data-g="tool">${TOOLS.map(t => spill(t, st.tool === t)).join('')}</div></div>
+    <div class="rs"><div class="lab" style="margin-right:6px">Sets x Reps</div><input type="number" inputmode="numeric" class="ms" value="${st.sets}"> <b>x</b> <input type="text" class="mr" value="${escS(st.reps)}" placeholder="reps"></div>
+    <input class="mn" placeholder="Note: why, cues, setup (optional)" maxlength="160" value="${escS(st.note)}">
+    <div class="act"><button class="ok2" style="background:var(--red);color:#fff">Apply</button><button class="clr" style="background:transparent;color:var(--fg);border:1px solid var(--line)">Undo Swap</button></div></div>`);
+  drawSwap(card); }
+
+function drawSwap(card){ const st = card._ms, p = card.querySelector('.swp'), q = st.q.toLowerCase(), fam = FAMS.find(f => f.name === st.fam);
+  const list = LIB.filter(e => (!fam || e.family_id === fam.id || (fam.name === 'Single Leg' && isUni(e) && famName(e.family_id) === 'Squat') || (fam.name === 'Hamstring' && HAM.test(e.name)))
+    && (st.side === 'Both' || EITHER.test(e.name) || (st.side === 'Unilateral') === isUni(e)) && (!q || e.name.toLowerCase().includes(q))).slice(0, 60);
+  p.querySelector('.alts').innerHTML = list.length ? list.map(e => `<button data-alt="${e.id}" class="${st.alt === e.id ? 'on' : ''}">${escS(e.name)}</button>`).join('') : '<div style="font-size:13px;opacity:.7">No matches. Try Both or clear the search.</div>'; }
+
+document.addEventListener('click', async e => {
+  const sb2 = e.target.closest('.swapb'); if (sb2) { openSwap(sb2.closest('.ex')); return; }
+  const p = e.target.closest('.swp'); if (!p) return; const card = p.closest('.ex'), st = card._ms;
+  const pb = e.target.closest('.pills button');
+  if (pb) { const g = pb.parentElement.dataset.g, v = pb.dataset.v;
+    if (g === 'tool' || g === 'why') st[g] = st[g] === v ? '' : v; else st[g] = v;
+    if (g === 'why' && WHY_FAM[v] && st.why === v) { st.fam = WHY_FAM[v]; if (v === 'Low Back') st.side = 'Unilateral'; }
+    p.querySelectorAll('.pills').forEach(P => { const k = P.dataset.g; P.querySelectorAll('button').forEach(b => b.classList.toggle('on', st[k] === b.dataset.v)); });
+    if (g !== 'tool') drawSwap(card); return; }
+  const ab = e.target.closest('.alts button'); if (ab) { st.alt = st.alt === +ab.dataset.alt ? null : +ab.dataset.alt; drawSwap(card); return; }
+  if (e.target.closest('.clr')) { card._mod = null; p.remove(); await applySwap(card); return; }
+  if (e.target.closest('.ok2')) { st.sets = Math.max(1, parseInt(p.querySelector('.ms').value) || 1); st.reps = p.querySelector('.mr').value.trim(); st.note = p.querySelector('.mn').value.trim();
+    card._mod = (st.tool || st.why || st.alt || st.note || st.sets !== card.querySelectorAll('.set').length || st.reps !== ((card.querySelector('[data-r]') || {}).value || '')) ? { ...st } : null;
+    p.remove(); await applySwap(card); } });
+document.addEventListener('input', e => { const a = e.target.closest('.swp .aq'); if (!a) return; const card = a.closest('.ex'); card._ms.q = a.value; drawSwap(card); });
+
+// rebuild this card's sets for the swap / new rep scheme (Undo puts the original back)
+async function applySwap(card){ const m = card._mod, rows = [...card.querySelectorAll('.set')]; if (!rows.length) return;
+  if (!card._orig) card._orig = { rows: rows.map(r => r.cloneNode(true)), prev: card.dataset.prev, sd: card.classList.contains('sd'), last: (card.querySelector('.lastln') || {}).textContent };
+  const parent = rows[0].parentElement, next = rows[rows.length - 1].nextSibling, O = card._orig;
+  rows.forEach(r => r.remove()); card.querySelector('.swtag')?.remove();
+  const tgt = card.querySelector('.sethdr b'); if (O.tgt === undefined) O.tgt = tgt ? tgt.textContent : '';
+  if (!m) { O.rows.forEach(r => parent.insertBefore(r.cloneNode(true), next)); card.dataset.prev = O.prev; card.classList.toggle('sd', O.sd); card.classList.remove('swapped'); if (tgt) tgt.textContent = O.tgt; updVol(); return; }
+  let L = null; if (m.alt) { const { data: h } = await sb.from('set_logs').select('set_number,weight,reps,workout_log_id,created_at').eq('member_id', member.id).eq('exercise_id', m.alt).order('created_at', { ascending: false }).limit(20);
+    if (h && h.length) L = h.filter(x => x.workout_log_id === h[0].workout_log_id).sort((a, b) => a.set_number - b.set_number); }
+  if (m.alt) { card.classList.remove('sd'); card.dataset.prev = L ? L.reduce((a, x) => a + (+x.weight || 0) * (+x.reps || 0), 0) : 0; }
+  card.classList.toggle('swapped', !!m.alt); if (tgt) tgt.textContent = m.reps || O.tgt;
+  const lastTx = m.alt ? (L ? 'Last time: ' + L.map(x => `${+x.weight ? fmtW(x.weight) : 'BW'} × ${x.reps}`).join(' · ') : 'First time logging this one. Pick a weight you can own.') : '';
+  for (let s = 0; s < m.sets; s++) { const r = O.rows[0].cloneNode(true); delete r.dataset.t; r.classList.remove('done');
+    const sp = r.querySelector('span'); if (sp) sp.textContent = s + 1;
+    const w = r.querySelector('[data-w]'), x = L ? (L[s] || L[L.length - 1]) : null; if (w) { w.value = m.alt ? (x && +x.weight ? +x.weight : '') : w.value; if (m.alt) w.placeholder = 'lb'; }
+    r.querySelectorAll('[data-r],[data-r2]').forEach(i => { i.value = parseInt(m.reps) || ''; i.placeholder = 'reps'; });
+    parent.insertBefore(r, next); }
+  const alt = m.alt && LIB.find(e => e.id === m.alt);
+  card.querySelector('.exhead').insertAdjacentHTML('afterend', `<div class="swtag">${escS([alt ? 'Swapped To: ' + alt.name : '', m.tool, `${m.sets} x ${m.reps || '?'}`, m.why].filter(Boolean).join(' · '))}${lastTx ? `<div style="font-weight:500;margin-top:2px">${escS(lastTx)}</div>` : ''}</div>`);
+  updVol(); }
 </script></body></html>
